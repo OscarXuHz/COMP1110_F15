@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from queue import Queue
 
@@ -22,7 +22,7 @@ class table: # 关于这个 class 有没有必要还有待商榷
     index: int
     max_people: int
     cur_people: int = 0
-    customers: list = []
+    customers: list = field(default_factory=list)
 
     def seat(self, req: request, return_cnt, cur_time):
         req.table = self.index
@@ -106,10 +106,10 @@ def main():
         # 先让之前的客人走，遍历桌子比遍历人清晰一些
         while req.table == -1 and cur_time <= 1000000:
             for t in tables:
-                for c in t.customers:
-                    if c.leave <= cur_time:
-                        t.cur_people -= c.people
-                        t.customers.remove(c)
+                leaving = [c for c in t.customers if c.leave <= cur_time]
+                for c in leaving:
+                    t.cur_people -= c.people
+                    t.customers.remove(c)
 
                 # 如果这个桌子走干净了，就让不让拼桌的来
                 if t.cur_people == 0:
