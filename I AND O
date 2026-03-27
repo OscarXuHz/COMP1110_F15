@@ -7,7 +7,8 @@ file 1: customer
      1.5 share：是否愿意拼桌（整数，1表示愿意，0表示不愿意）
      1.6 miss：是否过号（整数，0或1，代码中用于标记是否过号）
      1.7 comeback：过号后是否返回（整数，0或1）
-     1.8 ？
+     1.8 VIP: 0= vip
+     1.9 reservation： reserved = 1
     eg: 1,2,20230101120000,60,1,0,0, ?
 
 file 2: restaurant
