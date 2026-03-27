@@ -9,7 +9,7 @@ file 1: customer
      1.7 comeback：过号后是否返回（整数，0或1）
      1.8 VIP: 0= vip
      1.9 reservation： reserved = 1
-    eg: 1,2,20230101120000,60,1,0,0,0,0
+    eg: 1,2,20230101120000,60,1,0,0,0,0,0
 
 file 2: restaurant
      2.1 count：该类型餐桌的数量（整数）
