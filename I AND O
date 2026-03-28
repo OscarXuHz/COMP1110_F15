@@ -8,15 +8,17 @@ file 1: customer
      1.6 miss：是否过号（整数，0或1，代码中用于标记是否过号）
      1.7 comeback：过号后是否返回（整数，0或1）
      1.8 VIP: 0= vip
-     1.9 reservation： reserved = 1
-    eg: 1,2,20230101120000,60,1,0,0,0,0,0
+    eg: 1,2,20230101120000,60,1,0,0,0,0
 
 file 2: restaurant
      2.1 count：该类型餐桌的数量（整数）
      2.2 people：该餐桌最多可容纳的人数（整数）
     eg: 5,2
         3,4
-
+file 3: reservation（不接受拼桌，无迟到）
+     3.1 people: 顾客人数 （整数）
+     3.2 arrival：到达时间，格式为 YYYYMMDDHHMMSS（字符串）
+     3.3 duration：用餐时长（整数，单位：分钟）
 
 Output:
     average/max wait time，
