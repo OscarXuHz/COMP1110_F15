@@ -124,8 +124,8 @@ Gao Junhang · Liu Haojie · Xu Jiahang · Yan Weibo · Zhou Bocheng
 | Milestone | Description | Target Date | Responsible |
 |---|---|---|---|
 | Project Kick-off & Planning | Finalize roles, scope, assumptions, initial research plan | 18 Mar 2026 ✅ | All members |
-| Research Completion | Queue strategy survey, comparison table, assumptions docs | 22 Mar 2026 | Liu Haojie, Yan Weibo, Xu Jiahang |
-| Data Model & File I/O Done | Customer/table/queue data structures and file loading | 23 Mar 2026 | Liu Haojie, Gao Junhang, Xu Jiahang |
+| Research Completion | Queue strategy survey, comparison table, assumptions docs | 22 Mar 2026 ✅| Liu Haojie, Yan Weibo, Xu Jiahang |
+| Data Model & File I/O Done | Customer/table/queue data structures and file loading | 23 Mar 2026 ✅| Liu Haojie, Gao Junhang, Xu Jiahang |
 | Core Simulation Implemented | Event-driven logic for arrivals, seating, and time advance | 7 Apr 2026 | Liu Haojie, Gao Junhang, Xu Jiahang |
 | Metrics & Output Completed | Wait times, utilization, queue lengths, service level | 9 Apr 2026 | Gao Junhang, Xu Jiahang |
 | Scenario Design & Input Files | 5–6 paired scenarios, one factor varied each | 9 Apr 2026 | Gao Junhang, Zhou Bocheng |
