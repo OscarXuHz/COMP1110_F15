@@ -16,10 +16,7 @@ file 2: restaurant
      2.2 people：该餐桌最多可容纳的人数（整数）
     eg: 5,2
         3,4
-file 3: reservation（不接受拼桌，无迟到）
-     3.1 people: 顾客人数 （整数）
-     3.2 arrival：到达时间，格式为 YYYYMMDDHHMMSS（字符串）
-     3.3 duration：用餐时长（整数，单位：分钟）
+
 
 Output:
     average/max wait time，
