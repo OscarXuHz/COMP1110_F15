@@ -40,6 +40,13 @@ class Table:
             if not (re <= start or rs >= end):
                 return False
         return True
+    
+    def is_free_ignore_reserved(self, start: int, end: int) -> bool:
+        """检查在 [start, end) 时间段内是否无顾客占用（忽略预留检查）"""
+        for c in self.customers:
+            if not (c.leave_time <= start or c.arrival >= end):
+                return False
+        return True
 
     def seat(self, req: Request, cur_time: int):
         req.table = self
@@ -58,41 +65,42 @@ def parse_time(t_str: str) -> int:
     dt = datetime.strptime(t_str, '%Y%m%d%H%M%S')
     return int(dt.timestamp() / 60)
 
-def load_requests(csv_data: str) -> List[Request]:
-    """从 CSV 字符串加载请求"""
+def load_requests(filename: str) -> List[Request]:
+    """Load requests from CSV file"""
     requests = []
-    for line in csv_data.strip().split('\n'):
-        parts = line.strip().split(',')
-        if len(parts) < 9:
-            continue
-        idx, peo, arr, dur, share, miss, comeback, vip, res = parts
-        req = Request(
-            index=int(idx),
-            people=int(peo),
-            arrival=parse_time(arr),
-            duration=int(dur),
-            share=int(share),
-            miss=int(miss),
-            comeback=int(comeback),
-            vip=int(vip),
-            reserved=int(res)
-        )
-        requests.append(req)
+    with open(filename, 'r') as f:
+        for line in f:
+            parts = line.strip().split(',')
+            if len(parts) < 9:
+                continue
+            idx, peo, arr, dur, share, miss, comeback, vip, res = parts
+            req = Request(
+                index=int(idx),
+                people=int(peo),
+                arrival=parse_time(arr),
+                duration=int(dur),
+                share=int(share),
+                miss=int(miss),
+                comeback=int(comeback),
+                vip=int(vip),
+                reserved=int(res)
+            )
+            requests.append(req)
     return requests
 
 def allocate_reserved_tables(requests: List[Request], tables: List[Table]):
     """
     为预订顾客提前分配桌子（避免冲突）
-    返回预订顾客的 (request, table) 映射，并在桌子中记录预留区间
+    返回预订顾客的 (request.index, table) 映射，并在桌子中记录预留区间
     """
     # 按人数从大到小分配，减少冲突
     reserved_reqs = [r for r in requests if r.reserved == 1]
     reserved_reqs.sort(key=lambda x: (-x.people, x.arrival))
     assigned = {}
     for req in reserved_reqs:
-        # 找出所有能容纳该人数的桌子，按剩余空间最小优先（先找刚好合适的）
+        # 预订顾客必须预留整桌：选择能容纳该人数的最小桌子
         candidates = [t for t in tables if t.max_people >= req.people]
-        candidates.sort(key=lambda t: (t.max_people, t.index))  # 先选刚好合适的
+        candidates.sort(key=lambda t: (t.max_people, t.index))  # 按容量从小到大排序
         chosen = None
         for t in candidates:
             # 检查该时间段内是否已有预留冲突
@@ -108,7 +116,7 @@ def allocate_reserved_tables(requests: List[Request], tables: List[Table]):
             raise RuntimeError(f"无法为预订顾客 {req.index} 分配桌子，请检查数据")
         # 记录预留区间
         chosen.reserved_slots.append((req.arrival, req.arrival + req.duration))
-        assigned[req] = chosen
+        assigned[req.index] = chosen
     return assigned
 
 # ---------- 模拟主函数 ----------
@@ -116,13 +124,15 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
     # 为预订顾客预留桌子
     reserved_map = allocate_reserved_tables(requests, tables)
 
-    # 事件队列: (时间, 类型, 请求)
+    # 事件队列: (时间, 计数器, 类型, 请求)
+    event_counter = 0
     event_queue = []
     for req in requests:
-        heapq.heappush(event_queue, (req.arrival, 'arrival', req))
+        heapq.heappush(event_queue, (req.arrival, event_counter, 'arrival', req))
+        event_counter += 1
 
-    # 等待队列: (优先级, 到达时间, 请求)  优先级: 0=VIP, 1=普通
-    waiting_heap = []
+    # 等待队列: VIP 在队首，普通顾客在队尾
+    waiting_queue = []
     # 过号队列
     miss_queue = []   # 元素为 Request
 
@@ -145,7 +155,7 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
     cur_time = 0
     last_event_time = requests[0].arrival if requests else 0
 
-    while event_queue or waiting_heap or miss_queue:
+    while event_queue or waiting_queue or miss_queue:
         # 如果没有未来事件但有等待队列，则时间不能前进，但等待队列中的顾客只能由离开事件触发分配
         # 因此需要检查是否有离开事件即将发生
         if not event_queue:
@@ -154,7 +164,7 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
             break
 
         # 取出下一个事件
-        ev_time, ev_type, ev_req = heapq.heappop(event_queue)
+        ev_time, _, ev_type, ev_req = heapq.heappop(event_queue)
         cur_time = ev_time
 
         # ---------- 离开事件 ----------
@@ -165,8 +175,8 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
             table_busy_time[t.index] += ev_req.duration
 
             # 尝试从等待队列中分配
-            while waiting_heap:
-                prio, arr_time, w_req = heapq.heappop(waiting_heap)
+            while waiting_queue:
+                w_req = waiting_queue.pop(0)
                 # 重新尝试分配
                 assigned = False
                 # 根据拼桌意愿选择合适桌子
@@ -197,7 +207,8 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
                     if w_req.wait_time <= service_level_X:
                         served_within_X += 1
                     # 插入离开事件
-                    heapq.heappush(event_queue, (w_req.leave_time, 'leave', w_req))
+                    heapq.heappush(event_queue, (w_req.leave_time, event_counter, 'leave', w_req))
+                    event_counter += 1
                     # 计数器：如果是普通顾客（非VIP），增加
                     if w_req.vip == 0:
                         normal_served_count += 1
@@ -205,31 +216,35 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
                         if normal_served_count % 3 == 0 and miss_queue:
                             missed_req = miss_queue.pop(0)
                             if missed_req.comeback == 1:
-                                # 重新加入等待队列（按VIP优先级）
-                                heapq.heappush(waiting_heap, (0 if missed_req.vip else 1, missed_req.arrival, missed_req))
+                                # 重新加入等待队列（VIP 插队首，普通加队尾）
+                                if missed_req.vip == 1:
+                                    waiting_queue.insert(0, missed_req)
+                                else:
+                                    waiting_queue.append(missed_req)
                 else:
-                    # 分配失败，放回等待队列（但理论上刚释放桌子应该能分配成功，防止死循环）
-                    heapq.heappush(waiting_heap, (prio, arr_time, w_req))
+                    # 分配失败，放回等待队列队首（防止死循环）
+                    waiting_queue.insert(0, w_req)
                     break   # 无法继续分配，跳出
             # 记录等待队列长度
-            queue_lengths.append(len(waiting_heap))
-            max_queue_length = max(max_queue_length, len(waiting_heap))
+            queue_lengths.append(len(waiting_queue))
+            max_queue_length = max(max_queue_length, len(waiting_queue))
 
         # ---------- 到达事件 ----------
         elif ev_type == 'arrival':
             req = ev_req
             # 预订顾客：直接使用预留的桌子
             if req.reserved == 1:
-                t = reserved_map[req]
+                t = reserved_map[req.index]
                 # 检查预留是否仍然有效（没有其他顾客占用该时间段）
-                if t.is_free(req.arrival, req.arrival + req.duration):
+                if t.is_free_ignore_reserved(req.arrival, req.arrival + req.duration):
                     t.seat(req, req.arrival)
                     served_requests.append(req)
                     total_wait += req.wait_time
                     max_wait = max(max_wait, req.wait_time)
                     if req.wait_time <= service_level_X:
                         served_within_X += 1
-                    heapq.heappush(event_queue, (req.leave_time, 'leave', req))
+                    heapq.heappush(event_queue, (req.leave_time, event_counter, 'leave', req))
+                    event_counter += 1
                     if req.vip == 0:
                         normal_served_count += 1
                 else:
@@ -271,19 +286,27 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
                 max_wait = max(max_wait, req.wait_time)
                 if req.wait_time <= service_level_X:
                     served_within_X += 1
-                heapq.heappush(event_queue, (req.leave_time, 'leave', req))
+                heapq.heappush(event_queue, (req.leave_time, event_counter, 'leave', req))
+                event_counter += 1
                 if req.vip == 0:
                     normal_served_count += 1
                     if normal_served_count % 3 == 0 and miss_queue:
                         missed_req = miss_queue.pop(0)
                         if missed_req.comeback == 1:
-                            heapq.heappush(waiting_heap, (0 if missed_req.vip else 1, missed_req.arrival, missed_req))
+                            # 重新加入等待队列（VIP 插队首，普通加队尾）
+                            if missed_req.vip == 1:
+                                waiting_queue.insert(0, missed_req)
+                            else:
+                                waiting_queue.append(missed_req)
             else:
-                # 无法分配，进入等待队列（按VIP优先级）
-                heapq.heappush(waiting_heap, (0 if req.vip else 1, req.arrival, req))
+                # 无法分配，进入等待队列（VIP 插队首，普通加队尾）
+                if req.vip == 1:
+                    waiting_queue.insert(0, req)
+                else:
+                    waiting_queue.append(req)
                 # 记录等待队列长度
-                queue_lengths.append(len(waiting_heap))
-                max_queue_length = max(max_queue_length, len(waiting_heap))
+                queue_lengths.append(len(waiting_queue))
+                max_queue_length = max(max_queue_length, len(waiting_queue))
 
     # 计算总模拟时长：最后一个顾客离开时间
     total_time = max((r.leave_time for r in served_requests), default=0) - min((r.arrival for r in requests), default=0)
@@ -308,40 +331,7 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
 
 # ---------- 主函数 ----------
 def main():
-    # 顾客数据（30行，无表头）
-    csv_data = """
-1,4,20260101110000,60,1,0,0,0,0
-2,2,20260101110400,35,1,0,0,0,0
-3,6,20260101111000,85,1,0,0,1,0
-4,3,20260101111500,45,1,0,0,0,0
-5,1,20260101112300,25,0,0,0,0,1
-6,5,20260101113000,70,1,0,0,0,0
-7,2,20260101113500,40,1,1,1,0,0
-8,4,20260101114200,60,1,0,0,0,0
-9,6,20260101114800,90,1,0,0,1,0
-10,3,20260101115500,50,1,0,0,0,0
-11,2,20260101120300,30,1,0,0,0,1
-12,4,20260101121000,65,1,0,0,0,0
-13,5,20260101121800,75,1,0,0,1,0
-14,1,20260101122400,20,0,0,0,0,0
-15,3,20260101123100,45,1,0,0,0,0
-16,6,20260101123800,90,1,1,1,0,0
-17,2,20260101124500,35,1,0,0,0,1
-18,4,20260101125300,60,1,0,0,0,0
-19,5,20260101130000,75,1,0,0,1,0
-20,3,20260101130700,50,0,0,0,0,0
-21,1,20260101131500,25,1,1,0,0,0
-22,6,20260101132200,85,1,0,0,0,0
-23,4,20260101133000,65,1,0,0,1,0
-24,2,20260101133700,40,0,0,0,0,1
-25,3,20260101134500,50,1,0,0,0,0
-26,5,20260101135300,70,1,1,0,0,0
-27,1,20260101140000,25,1,0,0,0,1
-28,4,20260101140700,60,1,0,0,1,0
-29,6,20260101141500,90,1,0,0,0,0
-30,2,20260101142300,35,0,0,0,0,0
-"""
-    requests = load_requests(csv_data)
+    requests = load_requests('requests.csv')
 
     # 餐桌配置
     table_config = [(5,2), (3,4), (2,6), (1,8)]  # (数量, 容量)
@@ -353,15 +343,15 @@ def main():
     # 模拟
     stats = simulate(requests, tables)
 
-    # 输出结果
-    print("=== 餐厅排队模拟结果 ===")
-    print(f"平均等待时间: {stats['avg_wait']:.1f} 分钟")
-    print(f"最大等待时间: {stats['max_wait']} 分钟")
-    print(f"最大等待队列长度: {stats['max_queue_len']} 人")
-    print(f"成功服务组数: {stats['served']} 组")
-    print(f"餐桌平均利用率: {stats['table_util']:.1f}%")
-    print(f"服务等级 (10分钟内入座): {stats['service_level']:.1f}%")
-    print(f"总模拟时长: {stats['total_time']} 分钟")
+    print("Simulation Result:")
+    print("------------------")
+    print(f"Average Wait Time: {stats['avg_wait']:.1f} min")
+    print(f"Max Wait Time: {stats['max_wait']} min")
+    print(f"Peak Queue Length: {stats['max_queue_len']}")
+    print(f"Groups Served: {stats['served']}")
+    print(f"Table Utilization: {stats['table_util']:.1f}%")
+    print(f"Service Level (seated within 10 min): {stats['service_level']:.1f}%")
+    print(f"Total Time: {stats['total_time']} min")
 
 if __name__ == "__main__":
     main()
