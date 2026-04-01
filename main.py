@@ -285,6 +285,10 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
                 # missqueue暂时使用简单队列
                 continue 
 
+             if req.miss == 1 and req.comeback == 0:
+                continue
+                 # lhj:差点把这类神奇宝贝忘了
+
             if (waiting_queue or miss_queue) and not req.vip:
                 # 非VIP且有人在等，直接排队
                 wait_counter += 1
