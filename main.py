@@ -28,7 +28,7 @@ class Table:
     customers: List[Request] = field(default_factory=list)
     # 预留占用区间列表 (start, end)
     reserved_slots: List[Tuple[int, int]] = field(default_factory=list)
-    noshare: bool = False  # 是否禁止拼桌（v1.4.2 update）
+    noshare: bool = False  # 是否禁止拼桌（v1.5.0 update）
 
     def is_free(self, start: int, end: int) -> bool:
         """检查在 [start, end) 时间段内是否完全空闲（无顾客占用且无预留）"""
@@ -56,7 +56,7 @@ class Table:
         req.leave_time = cur_time + req.duration
         req.wait_time = cur_time - req.arrival
         self.cur_people += req.people
-        #update v1.4.2
+        #update v1.5.0
         if self.noshare:
             self.cur_people = self.max_people  # 如果禁止拼桌，直接占满
         self.customers.append(req)
@@ -70,7 +70,7 @@ class Table:
 
 # ---------- 辅助函数 ----------
 def parse_time(t_str: str) -> int:
-    """将 YYYYMMDDHHMMSS 转换为从第一个顾客到达开始的分钟数"""
+    """将 YYYYMMDDHHMMSS 转换为分钟数"""
     dt = datetime.strptime(t_str, '%Y%m%d%H%M%S')
     return int(dt.timestamp() / 60)
 
@@ -157,7 +157,7 @@ def allocate(tables: List[Table], w_req: Request, cur_time: int) -> bool:
         assigned = True
     return assigned
 
-#update v1.4.2 整合分配后续逻辑，避免重复代码
+#update v1.5.0 整合分配后续逻辑，避免重复代码
 def assign(served_requests: List[Request], waiting_queue: List[Request], miss_queue: List[Request], event_queue: List[Tuple[int, int, str, Request]], event_count: int, tables: List[Table], service_level_X: int, served_within_X: int, total_wait: int, max_wait: int, normal_served_count: int, req: Request):
     served_requests.append(req)
     total_wait += req.wait_time
@@ -167,12 +167,12 @@ def assign(served_requests: List[Request], waiting_queue: List[Request], miss_qu
     # 插入离开事件
     heapq.heappush(event_queue, (req.leave_time, event_count, 'leave', req))
     event_count += 1
-    # update v1.4.2 非 vip 也增加计数
+    # update v1.5.0 非 vip 也增加计数
     normal_served_count += 1
-    # update v1.4.2 重写过号逻辑，使用优先队列维护 waitingqueue，过号不再考虑vip
+    # update v1.5.0 重写过号逻辑，使用优先队列维护 waitingqueue，过号不再考虑vip
     if normal_served_count % 3 == 0 and miss_queue:
         missed_req = miss_queue.pop(0)
-        heapq.heappush(waiting_queue,missed_req, key = lambda r: (r.vip, r.arrival)) 
+        heapq.heappush(waiting_queue, (missed_req.vip, missed_req.arrival, missed_req)) 
         normal_served_count %= 3
 
 # ---------- 模拟主函数 ----------
@@ -181,7 +181,7 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
     reserved_map = allocate_reserved_tables(requests, tables)
 
     # 事件队列: (时间, 计数器, 类型, 请求)
-    # update v1.4.2 把 event_counter 改成 event_count，好听一点
+    # update v1.5.0 把 event_counter 改成 event_count，好听一点
     event_count = 0
     event_queue = []
     for req in requests:
@@ -234,13 +234,13 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
 
             # 尝试从等待队列中分配
             while waiting_queue:
-                w_req = waiting_queue.pop(0)
+                w_req = heapq.heappop(waiting_queue)[2]
                 assigned = allocate(tables, w_req, cur_time)
                 if assigned:
                     assign(served_requests, waiting_queue, miss_queue, event_queue, event_count, tables, service_level_X, served_within_X, total_wait, max_wait, normal_served_count, w_req)
                 else:
-                    #update v1.4.2 我们决定保留先到先得的原则，防止小顾客一直拆散大桌的情况
-                    heapq.heappush(waiting_queue, w_req, key = lambda r: (r.vip, r.arrival))  # 重新加入等待队列（VIP 插队首，普通加队尾）
+                    #update v1.5.0 我们决定保留先到先得的原则，防止小顾客一直拆散大桌的情况
+                    heapq.heappush(waiting_queue, (w_req.vip, w_req.arrival, w_req))  # 重新加入等待队列（VIP 插队首，普通加队尾）
                     break   # 无法继续分配，跳出
             # 记录等待队列长度
             queue_lengths.append(len(waiting_queue))
@@ -271,7 +271,7 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
                     raise RuntimeError(f"预订顾客 {req.index} 预留冲突")
                 continue
 
-            # update v1.4.2 重写过号逻辑：只有comeback 的过号顾客才会被处理
+            # update v1.5.0 重写过号逻辑：只有comeback 的过号顾客才会被处理
             if req.miss == 1 and req.comeback == 1:
                 req.wait_time = 0  # 过号后重新计算等待时间
                 req.arrival = req.arrival + 5 #简化处理
@@ -281,20 +281,19 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
 
             if waiting_queue or miss_queue and not req.vip:
                 # 如果有等待队列或过号队列，先加入等待队列（VIP 插队首，普通加队尾）
-                heapq.heappush(waiting_queue, req, key = lambda r: (r.vip, r.arrival))
+                heapq.heappush(waiting_queue, (req.vip, req.arrival, req))
                 # 记录等待队列长度
                 queue_lengths.append(len(waiting_queue))
                 max_queue_length = max(max_queue_length, len(waiting_queue))
                 continue
 
-            # update v1.4.2 重写分配逻辑，使用 allocate 函数统一处理分配，避免重复代码
+            # update v1.5.0 重写分配逻辑，使用 allocate 函数统一处理分配，避免重复代码
             assigned = allocate(tables, req, req.arrival)
             if assigned:
                 assign(served_requests, waiting_queue, miss_queue, event_queue, event_count, tables, service_level_X, served_within_X, total_wait, max_wait, normal_served_count, req)
             else:
-                #update v1.4.2 我们决定保留先到先得的原则，防止小顾客一直拆散大桌的情况
-                heapq.heappush(waiting_queue, req, key = lambda r: (r.vip, r.arrival))  # 重新加入等待队列（VIP 插队首，普通加队尾）
-                break   # 无法继续分配，跳出
+                #update v1.5.0 我们决定保留先到先得的原则，防止小顾客一直拆散大桌的情况
+                heapq.heappush(waiting_queue, (req.vip, req.arrival, req))  # 重新加入等待队列（VIP 插队首，普通加队尾）
 
     # 计算总模拟时长：最后一个顾客离开时间
     total_time = max((r.leave_time for r in served_requests), default=0) - min((r.arrival for r in requests), default=0)
