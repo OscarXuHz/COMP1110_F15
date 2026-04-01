@@ -28,6 +28,7 @@ class Table:
     customers: List[Request] = field(default_factory=list)
     # 预留占用区间列表 (start, end)
     reserved_slots: List[Tuple[int, int]] = field(default_factory=list)
+    noshare: bool = False  # 是否禁止拼桌（v1.4.2 update）
 
     def is_free(self, start: int, end: int) -> bool:
         """检查在 [start, end) 时间段内是否完全空闲（无顾客占用且无预留）"""
@@ -55,11 +56,17 @@ class Table:
         req.leave_time = cur_time + req.duration
         req.wait_time = cur_time - req.arrival
         self.cur_people += req.people
+        #update v1.4.2
+        if self.noshare:
+            self.cur_people = self.max_people  # 如果禁止拼桌，直接占满
         self.customers.append(req)
 
     def free(self, req: Request):
         self.cur_people -= req.people
         self.customers.remove(req)
+        if self.noshare:
+            self.noshare = False  # 释放后恢复拼桌能力
+            self.cur_people = 0  # 直接清空人数
 
 # ---------- 辅助函数 ----------
 def parse_time(t_str: str) -> int:
@@ -121,17 +128,65 @@ def allocate_reserved_tables(requests: List[Request], tables: List[Table]):
         assigned[req.index] = chosen
     return assigned
 
+# update v4.1.2 整合分配逻辑，避免重复代码
+def allocate(tables: List[Table], w_req: Request, cur_time: int) -> bool:
+    assigned = False
+    # 根据拼桌意愿选择合适桌子
+    candidates = []
+    for t in tables:
+        if t.is_free(cur_time, cur_time + w_req.duration):
+            # v1.4.1 update update 保证无reservation 冲突，只需保证当前有足够空位，即可完成落座
+            if t.max_people - t.cur_people >= w_req.people:
+                candidates.append((t.max_people - t.cur_people, t))
+    # 愿意拼桌则找剩余空间最小的，否则找完全空闲且人数匹配的
+    if w_req.share:
+        candidates.sort(key=lambda x: (x[0], x[1].index))
+        for _, t in candidates:
+            t.seat(w_req, cur_time)
+            assigned = True
+            break
+    else:
+        # update 1.4.2 重写 noshare 逻辑
+        # 不愿拼桌：找到最小的完全空闲且人数够的桌子
+        candidates = [(s, t) for s, t in candidates if t.cur_people == 0 and t.max_people >= w_req.people]
+        candidates.sort(key=lambda x: (x[0], x[1].index))
+        # 现在的 candidates 只包含合适的桌子且按大小升序排序
+        # 所以直接选第一个
+        candidates[0][1].noshare = True
+        candidates[0][1].seat(w_req, cur_time)
+        assigned = True
+    return assigned
+
+#update v1.4.2 整合分配后续逻辑，避免重复代码
+def assign(served_requests: List[Request], waiting_queue: List[Request], miss_queue: List[Request], event_queue: List[Tuple[int, int, str, Request]], event_count: int, tables: List[Table], service_level_X: int, served_within_X: int, total_wait: int, max_wait: int, normal_served_count: int, req: Request):
+    served_requests.append(req)
+    total_wait += req.wait_time
+    max_wait = max(max_wait, req.wait_time)
+    if req.wait_time <= service_level_X:
+        served_within_X += 1
+    # 插入离开事件
+    heapq.heappush(event_queue, (req.leave_time, event_count, 'leave', req))
+    event_count += 1
+    # update v1.4.2 非 vip 也增加计数
+    normal_served_count += 1
+    # update v1.4.2 重写过号逻辑，使用优先队列维护 waitingqueue，过号不再考虑vip
+    if normal_served_count % 3 == 0 and miss_queue:
+        missed_req = miss_queue.pop(0)
+        heapq.heappush(waiting_queue,missed_req, key = lambda r: (r.vip, r.arrival)) 
+        normal_served_count %= 3
+
 # ---------- 模拟主函数 ----------
 def simulate(requests: List[Request], tables: List[Table]) -> dict:
     # 为预订顾客预留桌子
     reserved_map = allocate_reserved_tables(requests, tables)
 
     # 事件队列: (时间, 计数器, 类型, 请求)
-    event_counter = 0
+    # update v1.4.2 把 event_counter 改成 event_count，好听一点
+    event_count = 0
     event_queue = []
     for req in requests:
-        heapq.heappush(event_queue, (req.arrival, event_counter, 'arrival', req))
-        event_counter += 1
+        heapq.heappush(event_queue, (req.arrival, event_count, 'arrival', req))
+        event_count += 1
 
     # 等待队列: VIP 在队首，普通顾客在队尾
     waiting_queue = []
@@ -180,62 +235,12 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
             # 尝试从等待队列中分配
             while waiting_queue:
                 w_req = waiting_queue.pop(0)
-                # 重新尝试分配
-                assigned = False
-                # 根据拼桌意愿选择合适桌子
-                candidates = []
-                for t in tables:
-                    if t.is_free(cur_time, cur_time + w_req.duration):
-                        # v1.4.1 update update 保证无reservation 冲突，只需保证当前有足够空位，即可完成落座
-                        if t.max_people - t.cur_people >= w_req.people:
-                            candidates.append((t.max_people - t.cur_people, t))
-                # 愿意拼桌则找剩余空间最小的，否则找完全空闲且人数匹配的
-                if w_req.share:
-                    candidates.sort(key=lambda x: (x[0], x[1].index))
-                    for _, t in candidates:
-                        t.seat(w_req, cur_time)
-                        assigned = True
-                        break
-                else:
-                    # 不愿拼桌：必须整桌空且人数匹配
-                    for _, t in candidates:
-                        # v1.4.1 update 这里放宽条件，允许多一个空位的情况存在（比如 3 人坐 4 人桌）
-                        # 按照原来的逻辑，如果没有3人桌，那么3人组永远坐不下去
-                        if t.cur_people == 0 and (t.max_people == w_req.people or t.max_people == w_req.people+1): 
-                            t.seat(w_req, cur_time)
-                            assigned = True
-                            break
-                    else:
-                        
+                assigned = allocate(tables, w_req, cur_time)
                 if assigned:
-                    served_requests.append(w_req)
-                    total_wait += w_req.wait_time
-                    max_wait = max(max_wait, w_req.wait_time)
-                    if w_req.wait_time <= service_level_X:
-                        served_within_X += 1
-                    # 插入离开事件
-                    heapq.heappush(event_queue, (w_req.leave_time, event_counter, 'leave', w_req))
-                    event_counter += 1
-                    # 计数器：如果是普通顾客（非VIP），增加
-                    # Oscar 小问题：VIP 不算入过号吗？
-                    if w_req.vip == 0:
-                        normal_served_count += 1
-                        # 每3个普通顾客处理一个过号
-                        if normal_served_count % 3 == 0 and miss_queue:
-                            missed_req = miss_queue.pop(0)
-                            if missed_req.comeback == 1:
-                                ''' Oscar: 为什么missed_req 里面会有不 comeback 的？
-                                    我们不是说只有 comeback 才入队吗
-                                '''
-                                # 重新加入等待队列（VIP 插队首，普通加队尾）
-                                if missed_req.vip == 1:
-                                    waiting_queue.insert(0, missed_req)
-                                else:
-                                    waiting_queue.append(missed_req)
+                    assign(served_requests, waiting_queue, miss_queue, event_queue, event_count, tables, service_level_X, served_within_X, total_wait, max_wait, normal_served_count, w_req)
                 else:
-                    # 分配失败，放回等待队列队首（防止死循环）
-                    # Oscar：这样反而可能造成死循环，并且 VIP 会拖累普通顾客。
-                    waiting_queue.insert(0, w_req)
+                    #update v1.4.2 我们决定保留先到先得的原则，防止小顾客一直拆散大桌的情况
+                    heapq.heappush(waiting_queue, w_req, key = lambda r: (r.vip, r.arrival))  # 重新加入等待队列（VIP 插队首，普通加队尾）
                     break   # 无法继续分配，跳出
             # 记录等待队列长度
             queue_lengths.append(len(waiting_queue))
@@ -244,6 +249,8 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
         # ---------- 到达事件 ----------
         elif ev_type == 'arrival':
             req = ev_req
+
+            # Oscar：这部分是废话
             # 预订顾客：直接使用预留的桌子
             if req.reserved == 1:
                 t = reserved_map[req.index]
@@ -255,8 +262,8 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
                     max_wait = max(max_wait, req.wait_time)
                     if req.wait_time <= service_level_X:
                         served_within_X += 1
-                    heapq.heappush(event_queue, (req.leave_time, event_counter, 'leave', req))
-                    event_counter += 1
+                    heapq.heappush(event_queue, (req.leave_time, event_count, 'leave', req))
+                    event_count += 1
                     if req.vip == 0:
                         normal_served_count += 1
                 else:
@@ -264,62 +271,30 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
                     raise RuntimeError(f"预订顾客 {req.index} 预留冲突")
                 continue
 
-            # 普通顾客处理过号标记
-            if req.miss == 1:
-                # 过号顾客先进入过号队列，稍后回叫
+            # update v1.4.2 重写过号逻辑：只有comeback 的过号顾客才会被处理
+            if req.miss == 1 and req.comeback == 1:
+                req.wait_time = 0  # 过号后重新计算等待时间
+                req.arrival = req.arrival + 5 #简化处理
                 miss_queue.append(req)
-                continue
+                # missqueue暂时使用简单队列
+                continue 
 
-            # 尝试分配
-            assigned = False
-            # 先按VIP插队？其实到达时直接尝试分配，不需要等待队列插队
-            candidates = []
-            for t in tables:
-                # Oscar： 同样的问题，这里的is free只会返回完全空的桌子
-                if t.is_free(req.arrival, req.arrival + req.duration):
-                    if t.max_people >= req.people:
-                        candidates.append((t.max_people - t.cur_people, t))
-            if req.share:
-                candidates.sort(key=lambda x: (x[0], x[1].index))
-                for _, t in candidates:
-                    if t.max_people - t.cur_people >= req.people:
-                        t.seat(req, req.arrival)
-                        assigned = True
-                        break
-            else:
-                for _, t in candidates:
-                    if t.cur_people == 0 and t.max_people == req.people:
-                        t.seat(req, req.arrival)
-                        assigned = True
-                        break
-
-            if assigned:
-                served_requests.append(req)
-                total_wait += req.wait_time
-                max_wait = max(max_wait, req.wait_time)
-                if req.wait_time <= service_level_X:
-                    served_within_X += 1
-                heapq.heappush(event_queue, (req.leave_time, event_counter, 'leave', req))
-                event_counter += 1
-                if req.vip == 0:
-                    normal_served_count += 1
-                    if normal_served_count % 3 == 0 and miss_queue:
-                        missed_req = miss_queue.pop(0)
-                        if missed_req.comeback == 1:
-                            # 重新加入等待队列（VIP 插队首，普通加队尾）
-                            if missed_req.vip == 1:
-                                waiting_queue.insert(0, missed_req)
-                            else:
-                                waiting_queue.append(missed_req)
-            else:
-                # 无法分配，进入等待队列（VIP 插队首，普通加队尾）
-                if req.vip == 1:
-                    waiting_queue.insert(0, req)
-                else:
-                    waiting_queue.append(req)
+            if waiting_queue or miss_queue and not req.vip:
+                # 如果有等待队列或过号队列，先加入等待队列（VIP 插队首，普通加队尾）
+                heapq.heappush(waiting_queue, req, key = lambda r: (r.vip, r.arrival))
                 # 记录等待队列长度
                 queue_lengths.append(len(waiting_queue))
                 max_queue_length = max(max_queue_length, len(waiting_queue))
+                continue
+
+            # update v1.4.2 重写分配逻辑，使用 allocate 函数统一处理分配，避免重复代码
+            assigned = allocate(tables, req, req.arrival)
+            if assigned:
+                assign(served_requests, waiting_queue, miss_queue, event_queue, event_count, tables, service_level_X, served_within_X, total_wait, max_wait, normal_served_count, req)
+            else:
+                #update v1.4.2 我们决定保留先到先得的原则，防止小顾客一直拆散大桌的情况
+                heapq.heappush(waiting_queue, req, key = lambda r: (r.vip, r.arrival))  # 重新加入等待队列（VIP 插队首，普通加队尾）
+                break   # 无法继续分配，跳出
 
     # 计算总模拟时长：最后一个顾客离开时间
     total_time = max((r.leave_time for r in served_requests), default=0) - min((r.arrival for r in requests), default=0)
