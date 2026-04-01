@@ -32,10 +32,12 @@ class Table:
     def is_free(self, start: int, end: int) -> bool:
         """检查在 [start, end) 时间段内是否完全空闲（无顾客占用且无预留）"""
         # 检查当前顾客
-        for c in self.customers:
-            if not (c.leave_time <= start or c.arrival >= end):
-                return False
+        # for c in self.customers:
+        #     if not (c.leave_time <= start or c.arrival >= end):
+        #         return False
         # 检查预留
+
+        #Oscar v1.4.1 update 这边只考虑预留冲突问题
         for rs, re in self.reserved_slots:
             if not (re <= start or rs >= end):
                 return False
@@ -113,7 +115,7 @@ def allocate_reserved_tables(requests: List[Request], tables: List[Table]):
                 chosen = t
                 break
         if chosen is None:
-            raise RuntimeError(f"无法为预订顾客 {req.index} 分配桌子，请检查数据")
+            raise RuntimeError(f"Cannot allocate table for request {req.index}, please check the data")
         # 记录预留区间
         chosen.reserved_slots.append((req.arrival, req.arrival + req.duration))
         assigned[req.index] = chosen
@@ -161,6 +163,7 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
         if not event_queue:
             # 没有事件，但等待队列非空，说明所有人都卡住了（桌子满且无人离开）——实际上不可能，因为总有离开事件
             # 但为了安全，跳出
+            print("Warning: No future events but waiting queue is not empty. Exiting simulation.")
             break
 
         # 取出下一个事件
@@ -183,23 +186,27 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
                 candidates = []
                 for t in tables:
                     if t.is_free(cur_time, cur_time + w_req.duration):
-                        if t.max_people >= w_req.people:
+                        # v1.4.1 update update 保证无reservation 冲突，只需保证当前有足够空位，即可完成落座
+                        if t.max_people - t.cur_people >= w_req.people:
                             candidates.append((t.max_people - t.cur_people, t))
                 # 愿意拼桌则找剩余空间最小的，否则找完全空闲且人数匹配的
                 if w_req.share:
                     candidates.sort(key=lambda x: (x[0], x[1].index))
                     for _, t in candidates:
-                        if t.max_people - t.cur_people >= w_req.people:
-                            t.seat(w_req, cur_time)
-                            assigned = True
-                            break
+                        t.seat(w_req, cur_time)
+                        assigned = True
+                        break
                 else:
                     # 不愿拼桌：必须整桌空且人数匹配
                     for _, t in candidates:
-                        if t.cur_people == 0 and t.max_people == w_req.people:
+                        # v1.4.1 update 这里放宽条件，允许多一个空位的情况存在（比如 3 人坐 4 人桌）
+                        # 按照原来的逻辑，如果没有3人桌，那么3人组永远坐不下去
+                        if t.cur_people == 0 and (t.max_people == w_req.people or t.max_people == w_req.people+1): 
                             t.seat(w_req, cur_time)
                             assigned = True
                             break
+                    else:
+                        
                 if assigned:
                     served_requests.append(w_req)
                     total_wait += w_req.wait_time
@@ -210,12 +217,16 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
                     heapq.heappush(event_queue, (w_req.leave_time, event_counter, 'leave', w_req))
                     event_counter += 1
                     # 计数器：如果是普通顾客（非VIP），增加
+                    # Oscar 小问题：VIP 不算入过号吗？
                     if w_req.vip == 0:
                         normal_served_count += 1
                         # 每3个普通顾客处理一个过号
                         if normal_served_count % 3 == 0 and miss_queue:
                             missed_req = miss_queue.pop(0)
                             if missed_req.comeback == 1:
+                                ''' Oscar: 为什么missed_req 里面会有不 comeback 的？
+                                    我们不是说只有 comeback 才入队吗
+                                '''
                                 # 重新加入等待队列（VIP 插队首，普通加队尾）
                                 if missed_req.vip == 1:
                                     waiting_queue.insert(0, missed_req)
@@ -223,6 +234,7 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
                                     waiting_queue.append(missed_req)
                 else:
                     # 分配失败，放回等待队列队首（防止死循环）
+                    # Oscar：这样反而可能造成死循环，并且 VIP 会拖累普通顾客。
                     waiting_queue.insert(0, w_req)
                     break   # 无法继续分配，跳出
             # 记录等待队列长度
@@ -263,6 +275,7 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
             # 先按VIP插队？其实到达时直接尝试分配，不需要等待队列插队
             candidates = []
             for t in tables:
+                # Oscar： 同样的问题，这里的is free只会返回完全空的桌子
                 if t.is_free(req.arrival, req.arrival + req.duration):
                     if t.max_people >= req.people:
                         candidates.append((t.max_people - t.cur_people, t))
