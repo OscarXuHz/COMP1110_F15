@@ -111,16 +111,12 @@ def allocate_reserved_tables(requests: List[Request], tables: List[Table]):
         candidates = [t for t in tables if t.max_people >= req.people]
         #v5.1.2 update NULL pretection
         if not candidates:
-            return False
+            raise RuntimeError(f"Cannot allocate table for reserved request {req.index}: no table large enough")
         candidates.sort(key=lambda t: (t.max_people, t.index))  # 按容量从小到大排序
         chosen = None
         for t in candidates:
             # 检查该时间段内是否已有预留冲突
-            conflict = False
-            for rs, re in t.reserved_slots:
-                if not (re <= req.arrival or rs >= req.arrival + req.duration):
-                    conflict = True
-                    break
+            conflict = any(not (re <= req.arrival or rs >= req.arrival + req.duration) for rs, re in t.reserved_slots)
             if not conflict:
                 chosen = t
                 break
@@ -169,6 +165,8 @@ def allocate(tables: List[Table], w_req: Request, cur_time: int) -> bool:
 def simulate(requests: List[Request], tables: List[Table]) -> dict:
     # 为预订顾客预留桌子
     reserved_map = allocate_reserved_tables(requests, tables)
+    sim_start = min(req.arrival for req in requests)
+    sim_end = 0
 
     # 事件队列: (时间, 计数器, 类型, 请求)
     # update v1.5.0 把 event_counter 改成 event_count，好听一点
@@ -249,6 +247,7 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
                     heapq.heappush(waiting_queue, (-w_req.vip, w_req.arrival, wait_counter, w_req))
                     break   # 无法继续分配，跳出
             # 记录等待队列长度
+            sim_end = max(sim_end, ev_req.leave_time)
             queue_lengths.append(len(waiting_queue))
             max_queue_length = max(max_queue_length, len(waiting_queue))
 
