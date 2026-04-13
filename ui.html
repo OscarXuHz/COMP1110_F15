@@ -5,34 +5,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Restaurant Queue Simulator</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   /* ── Global Variables ── */
   :root {
-    --bg: #f8f7f4;
+    --bg: #f5f4ed;
     --surface: #ffffff;
-    --surface2: #f3f2ef;
-    --border: #e5e3de;
-    --border2: #d4d2cc;
-    --text: #1a1917;
+    --surface2: #f0ede8;
+    --border: #e0dcd4;
+    --border2: #cec9be;
+    --text: #2d2a26;
     --text2: #6b6860;
     --text3: #9b9890;
-    --accent: #2563eb;
-    --accent-light: #eff6ff;
-    --accent-dark: #1d4ed8;
-    --success: #16a34a;
-    --success-light: #f0fdf4;
-    --warning: #d97706;
-    --warning-light: #fffbeb;
-    --danger: #dc2626;
-    --danger-light: #fef2f2;
+    --accent: #c96442;
+    --accent-light: #fdf0eb;
+    --accent-dark: #a84f33;
+    --success: #5a7a5a;
+    --success-light: #f0f5f0;
+    --warning: #b8860b;
+    --warning-light: #fdf6e3;
+    --danger: #b44040;
+    --danger-light: #fdf0f0;
     --gold: #b45309;
     --gold-light: #fef3c7;
+    --near-black: #1a1917;
     --radius: 10px;
     --radius-lg: 16px;
-    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
-    --shadow-md: 0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.05);
-    --shadow-lg: 0 10px 30px rgba(0,0,0,.10), 0 4px 8px rgba(0,0,0,.06);
+    --shadow: 0px 0px 0px 1px var(--border);
+    --shadow-md: 0px 0px 0px 1px var(--border), 0 2px 8px rgba(0,0,0,.04);
+    --shadow-lg: 0px 0px 0px 1px var(--border), 0 4px 16px rgba(0,0,0,.06);
     --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --serif: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
     --mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
   }
 
@@ -114,7 +117,7 @@
     background: transparent;
     color: var(--text3);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.3s;
     font-size: 0.78rem;
     font-weight: 600;
     letter-spacing: 0.02em;
@@ -166,7 +169,7 @@
     font-weight: 500;
     color: var(--text2);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.3s;
     border: none;
     background: none;
     width: 100%;
@@ -199,7 +202,7 @@
   /* ── Main Content ── */
   .main-content { padding: 32px; overflow-y: auto; }
   .page { display: none; }
-  .page.active { display: block; }
+  .page.active { display: block; animation: fadeIn 0.4s ease; }
 
   /* ── Page Header ── */
   .page-header { margin-bottom: 28px; }
@@ -209,6 +212,7 @@
     letter-spacing: -0.02em;
     color: var(--text);
     margin-bottom: 4px;
+    font-family: var(--serif);
   }
   .page-subtitle { font-size: 0.875rem; color: var(--text2); }
 
@@ -248,17 +252,17 @@
     font-size: 0.85rem;
     font-weight: 500;
     border: none;
-    transition: all 0.15s;
+    transition: all 0.3s;
     white-space: nowrap;
   }
   .btn-primary { background: var(--accent); color: white; }
-  .btn-primary:hover { background: var(--accent-dark); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,235,.3); }
+  .btn-primary:hover { background: var(--accent-dark); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(201,100,66,.25); }
   .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
   .btn-secondary:hover { background: var(--border); }
-  .btn-danger { background: var(--danger-light); color: var(--danger); border: 1px solid #fecaca; }
+  .btn-danger { background: var(--danger-light); color: var(--danger); border: 1px solid #e0b5b5; }
   .btn-danger:hover { background: #fee2e2; }
   .btn-success { background: var(--success); color: white; }
-  .btn-success:hover { background: #15803d; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(22,163,74,.3); }
+  .btn-success:hover { background: #4a6a4a; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(90,122,90,.25); }
   .btn-ghost { background: transparent; color: var(--text2); border: 1px solid transparent; }
   .btn-ghost:hover { background: var(--surface2); color: var(--text); }
   .btn-sm { padding: 5px 10px; font-size: 0.78rem; }
@@ -280,10 +284,10 @@
     font-size: 0.875rem;
     color: var(--text);
     background: var(--surface);
-    transition: border-color 0.15s, box-shadow 0.15s;
+    transition: border-color 0.3s, box-shadow 0.3s;
     outline: none;
   }
-  .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+  .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(201,100,66,.12); }
   .form-select {
     padding: 8px 12px;
     border: 1px solid var(--border2);
@@ -293,14 +297,14 @@
     background: var(--surface);
     cursor: pointer;
     outline: none;
-    transition: border-color 0.15s;
+    transition: border-color 0.3s;
     appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b6860' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 10px center;
     padding-right: 28px;
   }
-  .form-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+  .form-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(201,100,66,.12); }
 
   /* ── Table Config ── */
   .table-config-list { display: flex; flex-direction: column; gap: 10px; }
@@ -313,7 +317,7 @@
     background: var(--surface2);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    transition: all 0.15s;
+    transition: all 0.3s;
   }
   .table-config-item:hover { border-color: var(--border2); box-shadow: var(--shadow); }
   .table-config-item .item-label { font-size: 0.78rem; font-weight: 600; color: var(--text3); margin-bottom: 3px; }
@@ -323,7 +327,8 @@
     margin-top: 16px;
     padding: 14px 16px;
     background: var(--accent-light);
-    border: 1px solid #bfdbfe;
+    border: 1px solid #e8c4b5;
+    border-left: 3px solid var(--accent);
     border-radius: var(--radius);
   }
   .config-summary-item { font-size: 0.85rem; color: var(--accent); }
@@ -388,7 +393,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s;
     background: var(--surface2);
   }
   .preset-card:hover {
@@ -405,7 +410,7 @@
     color: var(--accent);
     margin-bottom: 4px;
   }
-  .preset-name { font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .preset-name { font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 4px; font-family: var(--serif); }
   .preset-desc { font-size: 0.8rem; color: var(--text2); margin-bottom: 10px; }
   .preset-tags { display: flex; flex-wrap: wrap; gap: 4px; }
   .preset-tag {
@@ -421,7 +426,7 @@
 
   /* ── Run Panel ── */
   .run-panel {
-    background: linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #3b82f6 100%);
+    background: linear-gradient(135deg, #1a1917 0%, #2d2a26 50%, #3d3830 100%);
     border-radius: var(--radius-lg);
     padding: 40px;
     text-align: center;
@@ -429,7 +434,7 @@
     margin-bottom: 20px;
     box-shadow: var(--shadow-lg);
   }
-  .run-panel h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; }
+  .run-panel h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; font-family: var(--serif); }
   .run-panel p { font-size: 0.9rem; opacity: 0.85; margin-bottom: 28px; }
   .run-info {
     display: flex;
@@ -437,7 +442,7 @@
     gap: 40px;
     margin-bottom: 28px;
   }
-  .run-info-item .val { font-size: 2.5rem; font-weight: 800; line-height: 1; }
+  .run-info-item .val { font-size: 2.5rem; font-weight: 800; line-height: 1; font-family: var(--serif); }
   .run-info-item .lbl { font-size: 0.8rem; opacity: 0.75; margin-top: 4px; }
   .run-btn {
     background: white;
@@ -448,7 +453,7 @@
     font-size: 1rem;
     font-weight: 700;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.3s;
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -458,13 +463,16 @@
   .run-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
   .spinner {
     width: 18px; height: 18px;
-    border: 2.5px solid rgba(37,99,235,.3);
+    border: 2.5px solid rgba(201,100,66,.3);
     border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
     display: none;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes widthGrow { from { width: 0; } }
 
   /* ── Stats Cards ── */
   .stats-grid {
@@ -479,8 +487,16 @@
     border-radius: var(--radius-lg);
     padding: 20px;
     box-shadow: var(--shadow);
-    transition: all 0.2s;
+    transition: all 0.3s;
+    animation: slideUp 0.4s ease both;
   }
+  .stat-card:nth-child(1) { animation-delay: 0s; }
+  .stat-card:nth-child(2) { animation-delay: 0.05s; }
+  .stat-card:nth-child(3) { animation-delay: 0.1s; }
+  .stat-card:nth-child(4) { animation-delay: 0.15s; }
+  .stat-card:nth-child(5) { animation-delay: 0.2s; }
+  .stat-card:nth-child(6) { animation-delay: 0.25s; }
+  .stat-card:nth-child(7) { animation-delay: 0.3s; }
   .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
   .stat-card .stat-label {
     font-size: 0.75rem;
@@ -499,14 +515,15 @@
     letter-spacing: -0.03em;
     line-height: 1;
     color: var(--text);
+    font-family: var(--serif);
   }
   .stat-card .stat-unit { font-size: 0.85rem; font-weight: 400; color: var(--text3); margin-left: 2px; }
   .stat-card .stat-desc { font-size: 0.75rem; color: var(--text3); margin-top: 6px; }
-  .stat-card.accent { border-color: #bfdbfe; background: var(--accent-light); }
+  .stat-card.accent { border-color: #e8c4b5; background: var(--accent-light); }
   .stat-card.accent .stat-value { color: var(--accent); }
-  .stat-card.success { border-color: #bbf7d0; background: var(--success-light); }
+  .stat-card.success { border-color: #b5ccb5; background: var(--success-light); }
   .stat-card.success .stat-value { color: var(--success); }
-  .stat-card.warning { border-color: #fde68a; background: var(--warning-light); }
+  .stat-card.warning { border-color: #e8d5a0; background: var(--warning-light); }
   .stat-card.warning .stat-value { color: var(--warning); }
 
   /* ── Charts ── */
@@ -519,6 +536,7 @@
   .chart-card {
     background: var(--surface);
     border: 1px solid var(--border);
+    border-top: 3px solid var(--accent);
     border-radius: var(--radius-lg);
     padding: 24px;
     box-shadow: var(--shadow);
@@ -585,7 +603,7 @@
     padding: 24px;
     text-align: center;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.3s;
     background: var(--surface2);
   }
   .upload-zone:hover, .upload-zone.drag-over {
@@ -606,7 +624,8 @@
     justify-content: space-between;
     padding: 14px 20px;
     background: var(--success-light);
-    border: 1px solid #bbf7d0;
+    border: 1px solid #b5ccb5;
+    border-left: 3px solid var(--success);
     border-radius: var(--radius);
     margin-bottom: 20px;
   }
@@ -652,7 +671,7 @@
 <!-- Header -->
 <header class="app-header">
   <div class="logo">
-    <div class="icon">🍽</div>
+    <div class="icon">R</div>
     Restaurant Queue Simulator
   </div>
   <div class="header-right">
@@ -674,16 +693,16 @@
     <div class="sidebar-section">
       <div class="sidebar-label" data-i18n="nav_section_config">Configuration</div>
       <button class="nav-item active" onclick="showPage('tables')" id="nav-tables">
-        <span class="nav-icon">🪑</span>
+        <span class="nav-icon"></span>
         <span data-i18n="nav_tables">Table Setup</span>
       </button>
       <button class="nav-item" onclick="showPage('requests')" id="nav-requests">
-        <span class="nav-icon">👥</span>
+        <span class="nav-icon"></span>
         <span data-i18n="nav_requests">Customer Requests</span>
         <span class="nav-badge" id="badge-requests">0</span>
       </button>
       <button class="nav-item" onclick="showPage('presets')" id="nav-presets">
-        <span class="nav-icon">📂</span>
+        <span class="nav-icon"></span>
         <span data-i18n="nav_presets">Preset Cases</span>
       </button>
     </div>
@@ -691,11 +710,11 @@
     <div class="sidebar-section">
       <div class="sidebar-label" data-i18n="nav_section_sim">Simulation</div>
       <button class="nav-item" onclick="showPage('run')" id="nav-run">
-        <span class="nav-icon">▶️</span>
+        <span class="nav-icon"></span>
         <span data-i18n="nav_run">Run Simulation</span>
       </button>
       <button class="nav-item" onclick="showPage('results')" id="nav-results">
-        <span class="nav-icon">📊</span>
+        <span class="nav-icon"></span>
         <span data-i18n="nav_results">Results</span>
       </button>
     </div>
@@ -711,14 +730,14 @@
     <!-- ── Page: Table Setup ── -->
     <div class="page active" id="page-tables">
       <div class="page-header">
-        <div class="page-title">🪑 <span data-i18n="tables_title">Table Setup</span></div>
+        <div class="page-title"><span data-i18n="tables_title">Table Setup</span></div>
         <div class="page-subtitle" data-i18n="tables_subtitle">Define table types, quantities and seating capacities</div>
       </div>
 
       <div class="card">
         <div class="card-header">
           <div>
-            <div class="card-title"><span class="icon">📋</span> <span data-i18n="tables_card_title">Current Table Configuration</span></div>
+            <div class="card-title"><span data-i18n="tables_card_title">Current Table Configuration</span></div>
             <div class="card-subtitle" data-i18n="tables_card_subtitle">Each row represents one table type — add or remove freely</div>
           </div>
           <button class="btn btn-primary btn-sm" onclick="addTableType()">
@@ -736,7 +755,7 @@
 
         <div class="divider"></div>
 
-        <div class="card-title" style="margin-bottom:12px;"><span class="icon">⚡</span> <span data-i18n="tables_presets_title">Quick Presets</span></div>
+        <div class="card-title" style="margin-bottom:12px;"><span data-i18n="tables_presets_title">Quick Presets</span></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-secondary btn-sm" onclick="applyPresetTables('default')" data-i18n="tables_preset_default">Default (5×2 + 3×4 + 2×6 + 1×8)</button>
           <button class="btn btn-secondary btn-sm" onclick="applyPresetTables('small')" data-i18n="tables_preset_small">Small Restaurant (3×2 + 2×4)</button>
@@ -748,14 +767,14 @@
     <!-- ── Page: Customer Requests ── -->
     <div class="page" id="page-requests">
       <div class="page-header">
-        <div class="page-title">👥 <span data-i18n="requests_title">Customer Requests</span></div>
+        <div class="page-title"><span data-i18n="requests_title">Customer Requests</span></div>
         <div class="page-subtitle" data-i18n="requests_subtitle">Add requests manually or import from CSV</div>
       </div>
 
       <!-- Add Form -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="icon">✏️</span> <span data-i18n="requests_form_title">Add New Request</span></div>
+          <div class="card-title"><span data-i18n="requests_form_title">Add New Request</span></div>
         </div>
         <div class="form-grid" id="addRequestForm">
           <div class="form-group">
@@ -815,11 +834,11 @@
       <!-- CSV Import -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="icon">📁</span> <span data-i18n="csv_import_title">CSV Batch Import</span></div>
+          <div class="card-title"><span data-i18n="csv_import_title">CSV Batch Import</span></div>
         </div>
         <div class="upload-zone" id="uploadZone" onclick="document.getElementById('csvFileInput').click()"
              ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
-          <div class="upload-icon">📤</div>
+          <div class="upload-icon"></div>
           <p data-i18n="csv_upload_hint">Click to select a CSV file, or drag and drop here</p>
           <span>Format: index,people,arrival,duration,share,miss,comeback,vip,reserved</span>
         </div>
@@ -830,12 +849,12 @@
       <div class="card">
         <div class="card-header">
           <div>
-            <div class="card-title"><span class="icon">📋</span> <span data-i18n="requests_list_title">Request List</span></div>
+            <div class="card-title"><span data-i18n="requests_list_title">Request List</span></div>
             <div class="card-subtitle" id="requestCount">0 requests</div>
           </div>
           <div style="display:flex;gap:8px;">
-            <button class="btn btn-secondary btn-sm" onclick="exportRequestsCSV()">⬇ <span data-i18n="btn_export_csv">Export CSV</span></button>
-            <button class="btn btn-danger btn-sm" onclick="clearAllRequests()">🗑 <span data-i18n="btn_clear_all">Clear All</span></button>
+            <button class="btn btn-secondary btn-sm" onclick="exportRequestsCSV()"><span data-i18n="btn_export_csv">Export CSV</span></button>
+            <button class="btn btn-danger btn-sm" onclick="clearAllRequests()"><span data-i18n="btn_clear_all">Clear All</span></button>
           </div>
         </div>
         <div class="table-wrapper">
@@ -855,7 +874,7 @@
               </tr>
             </thead>
             <tbody id="requestTableBody">
-              <tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📭</div><p data-i18n="requests_empty">No requests yet. Add manually or import a CSV.</p></div></td></tr>
+              <tr><td colspan="10"><div class="empty-state"><div class="empty-icon"></div><p data-i18n="requests_empty">No requests yet. Add manually or import a CSV.</p></div></td></tr>
             </tbody>
           </table>
         </div>
@@ -865,25 +884,25 @@
     <!-- ── Page: Preset Cases ── -->
     <div class="page" id="page-presets">
       <div class="page-header">
-        <div class="page-title">📂 <span data-i18n="presets_title">Preset Test Cases</span></div>
+        <div class="page-title"><span data-i18n="presets_title">Preset Test Cases</span></div>
         <div class="page-subtitle" data-i18n="presets_subtitle">One-click load from request1.csv ~ request10.csv in the project directory</div>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="icon">🗂</span> <span data-i18n="presets_available">Available Test Cases</span></div>
-          <button class="btn btn-secondary btn-sm" onclick="loadPresets()">🔄 <span data-i18n="btn_refresh">Refresh</span></button>
+          <div class="card-title"><span data-i18n="presets_available">Available Test Cases</span></div>
+          <button class="btn btn-secondary btn-sm" onclick="loadPresets()"><span data-i18n="btn_refresh">Refresh</span></button>
         </div>
         <div class="preset-grid" id="presetGrid">
           <div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--text3);">
-            <div style="font-size:32px;margin-bottom:8px;">⏳</div>
+            <div style="font-size:32px;margin-bottom:8px;"></div>
             <p data-i18n="presets_loading">Loading preset cases...</p>
           </div>
         </div>
       </div>
 
       <div class="card" style="margin-top:20px;">
-        <div class="card-title" style="margin-bottom:8px;"><span class="icon">ℹ️</span> <span data-i18n="presets_info_title">How It Works</span></div>
+        <div class="card-title" style="margin-bottom:8px;"><span data-i18n="presets_info_title">How It Works</span></div>
         <p style="font-size:0.85rem;color:var(--text2);line-height:1.7;" data-i18n="presets_info_body">
           Click any preset card to load its customer request data into the Customer Requests page.
           If a matching restaurant{n}.csv file exists, the table configuration will also be updated automatically.
@@ -895,12 +914,12 @@
     <!-- ── Page: Run Simulation ── -->
     <div class="page" id="page-run">
       <div class="page-header">
-        <div class="page-title">▶️ <span data-i18n="run_title">Run Simulation</span></div>
+        <div class="page-title"><span data-i18n="run_title">Run Simulation</span></div>
         <div class="page-subtitle" data-i18n="run_subtitle">Review configuration and execute the restaurant queue simulation</div>
       </div>
 
       <div class="run-panel">
-        <h2>🍽 Restaurant Queue Simulator</h2>
+        <h2>Restaurant Queue Simulator</h2>
         <p data-i18n="run_desc">Event-driven restaurant queue engine — supports VIP priority, table sharing, reservations, missed turns and more</p>
         <div class="run-info">
           <div class="run-info-item">
@@ -918,13 +937,13 @@
         </div>
         <button class="run-btn" id="runBtn" onclick="runSimulation()">
           <div class="spinner" id="runSpinner"></div>
-          <span id="runBtnText" data-i18n="run_btn">▶ Start Simulation</span>
+          <span id="runBtnText" data-i18n="run_btn">Start Simulation</span>
         </button>
       </div>
 
       <!-- Config Preview -->
       <div class="card" style="margin-top:20px;">
-        <div class="card-title" style="margin-bottom:16px;"><span class="icon">🔍</span> <span data-i18n="run_preview_title">Current Configuration Preview</span></div>
+        <div class="card-title" style="margin-bottom:16px;"><span data-i18n="run_preview_title">Current Configuration Preview</span></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
           <div>
             <div style="font-size:0.8rem;font-weight:600;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;" data-i18n="run_preview_tables">Table Configuration</div>
@@ -941,12 +960,12 @@
     <!-- ── Page: Results ── -->
     <div class="page" id="page-results">
       <div class="page-header">
-        <div class="page-title">📊 <span data-i18n="results_title">Simulation Results</span></div>
+        <div class="page-title"><span data-i18n="results_title">Simulation Results</span></div>
         <div class="page-subtitle" data-i18n="results_subtitle">Statistics, wait time distribution and table utilization visualization</div>
       </div>
 
       <div id="noResults" style="text-align:center;padding:64px 24px;color:var(--text3);">
-        <div style="font-size:48px;margin-bottom:16px;">📊</div>
+        <div style="font-size:48px;margin-bottom:16px;"></div>
         <p style="font-size:1rem;font-weight:500;margin-bottom:8px;" data-i18n="results_empty_title">No results yet</p>
         <p style="font-size:0.875rem;" data-i18n="results_empty_desc">Configure tables and customer requests, then go to Run Simulation</p>
         <button class="btn btn-primary" style="margin-top:20px;" onclick="showPage('run')" data-i18n="results_go_run">Go to Run Simulation</button>
@@ -955,8 +974,8 @@
       <div id="resultsContent" style="display:none;">
         <!-- Export Bar -->
         <div class="export-bar">
-          <p>✅ <span data-i18n="results_done">Simulation complete! Results are ready.</span></p>
-          <button class="btn btn-success btn-sm" onclick="exportResults()">⬇ <span data-i18n="btn_export_full">Export Full Results CSV</span></button>
+          <p><span data-i18n="results_done">Simulation complete! Results are ready.</span></p>
+          <button class="btn btn-success btn-sm" onclick="exportResults()"><span data-i18n="btn_export_full">Export Full Results CSV</span></button>
         </div>
 
         <!-- Stats Cards -->
@@ -965,13 +984,13 @@
         <!-- Charts -->
         <div class="charts-grid">
           <div class="chart-card">
-            <div class="chart-title">📈 <span data-i18n="chart_wait_title">Wait Time Distribution</span></div>
+            <div class="chart-title"><span data-i18n="chart_wait_title">Wait Time Distribution</span></div>
             <div class="chart-container">
               <canvas id="waitTimeChart"></canvas>
             </div>
           </div>
           <div class="chart-card">
-            <div class="chart-title">🥧 <span data-i18n="chart_util_title">Table Utilization</span></div>
+            <div class="chart-title"><span data-i18n="chart_util_title">Table Utilization</span></div>
             <div class="chart-container">
               <canvas id="tableUtilChart"></canvas>
             </div>
@@ -981,7 +1000,7 @@
         <!-- Wait Time Detail Table -->
         <div class="card">
           <div class="card-header">
-            <div class="card-title"><span class="icon">📋</span> <span data-i18n="results_wait_detail_title">Per-Customer Wait Time Detail</span></div>
+            <div class="card-title"><span data-i18n="results_wait_detail_title">Per-Customer Wait Time Detail</span></div>
           </div>
           <div class="table-wrapper">
             <table>
@@ -1002,7 +1021,7 @@
         <!-- Table Utilization Detail -->
         <div class="card">
           <div class="card-header">
-            <div class="card-title"><span class="icon">🪑</span> <span data-i18n="results_util_detail_title">Per-Table Utilization Detail</span></div>
+            <div class="card-title"><span data-i18n="results_util_detail_title">Per-Table Utilization Detail</span></div>
           </div>
           <div class="table-wrapper">
             <table>
@@ -1152,7 +1171,7 @@ const I18N = {
     run_info_tables: 'Tables',
     run_info_requests: 'Requests',
     run_info_capacity: 'Total Seats',
-    run_btn: '▶ Start Simulation',
+    run_btn: 'Start Simulation',
     run_btn_running: 'Running...',
     run_preview_title: 'Current Configuration Preview',
     run_preview_tables: 'Table Configuration',
@@ -1206,8 +1225,8 @@ const I18N = {
     row_table_prefix: 'Table',
     row_seat_suffix: 'seats',
     row_min_suffix: 'min',
-    row_status_ok: '✅ On Time',
-    row_status_late: '⚠️ Exceeded',
+    row_status_ok: 'On Time',
+    row_status_late: 'Exceeded',
 
     // Loading
     loading_text: 'Running simulation, please wait...',
@@ -1346,7 +1365,7 @@ const I18N = {
     run_info_tables: '张桌子',
     run_info_requests: '条请求',
     run_info_capacity: '总座位',
-    run_btn: '▶ 开始模拟',
+    run_btn: '开始模拟',
     run_btn_running: '运行中...',
     run_preview_title: '当前配置预览',
     run_preview_tables: '餐桌配置',
@@ -1400,8 +1419,8 @@ const I18N = {
     row_table_prefix: '桌',
     row_seat_suffix: '座',
     row_min_suffix: '分钟',
-    row_status_ok: '✅ 达标',
-    row_status_late: '⚠️ 超时',
+    row_status_ok: '达标',
+    row_status_late: '超时',
 
     // Loading
     loading_text: '正在运行模拟，请稍候...',
@@ -1513,7 +1532,7 @@ function showPage(name) {
 //  Toast Notifications
 // ═══════════════════════════════════════════════════════════
 function toast(msg, type = 'info', duration = 3000) {
-  const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+  const icons = { success: '✓', error: '✗', info: '—' };
   const el = document.createElement('div');
   el.className = `toast toast-${type}`;
   el.innerHTML = `<span>${icons[type]}</span><span>${msg}</span>`;
@@ -1559,7 +1578,7 @@ function renderTableConfig() {
           <input type="number" class="form-input" min="1" max="20" value="${item.capacity}"
             onchange="updateTableConfig(${i}, 'capacity', this.value)">
         </div>
-        <button class="btn btn-danger btn-sm" onclick="removeTableType(${i})">🗑</button>
+        <button class="btn btn-danger btn-sm" onclick="removeTableType(${i})">Del</button>
       </div>
     `).join('');
   }
@@ -1609,7 +1628,7 @@ function renderRequests() {
   document.getElementById('badge-requests').textContent = state.requests.length;
 
   if (state.requests.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📭</div><p>${t('requests_empty')}</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="empty-icon"></div><p>${t('requests_empty')}</p></div></td></tr>`;
     return;
   }
 
@@ -1744,7 +1763,7 @@ function exportRequestsCSV() {
 async function loadPresets() {
   const grid = document.getElementById('presetGrid');
   grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--text3);">
-    <div style="font-size:32px;margin-bottom:8px;">⏳</div>
+    <div style="font-size:32px;margin-bottom:8px;"></div>
     <p>${t('presets_loading')}</p>
   </div>`;
 
@@ -1755,7 +1774,7 @@ async function loadPresets() {
 
     if (data.presets.length === 0) {
       grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--text3);">
-        <div style="font-size:32px;margin-bottom:8px;">📭</div>
+        <div style="font-size:32px;margin-bottom:8px;"></div>
         <p>${t('presets_not_found')}</p>
       </div>`;
       return;
@@ -1765,7 +1784,7 @@ async function loadPresets() {
     renderPresetCards(data.presets);
   } catch (e) {
     grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--danger);">
-      <div style="font-size:32px;margin-bottom:8px;">❌</div>
+      <div style="font-size:32px;margin-bottom:8px;"></div>
       <p>${t('presets_load_error', e.message)}</p>
       <p style="font-size:0.8rem;margin-top:8px;color:var(--text3);">${t('presets_load_error_hint')}</p>
     </div>`;
@@ -1781,9 +1800,9 @@ function renderPresetCards(presets) {
     const count = p.count !== undefined ? p.count : p.requests.length;
     const desc = t('preset_desc', count, hasVip, hasReserved, hasMiss);
     const tags = [
-      hasVip ? '<span class="preset-tag tag-vip">⭐ VIP</span>' : '',
-      hasReserved ? `<span class="preset-tag tag-reserved">📅 ${t('preset_tag_reserved')}</span>` : '',
-      hasMiss ? `<span class="preset-tag tag-miss">⚠️ ${t('preset_tag_miss')}</span>` : '',
+      hasVip ? '<span class="preset-tag tag-vip">VIP</span>' : '',
+      hasReserved ? `<span class="preset-tag tag-reserved">${t('preset_tag_reserved')}</span>` : '',
+      hasMiss ? `<span class="preset-tag tag-miss">${t('preset_tag_miss')}</span>` : '',
     ].filter(Boolean).join('');
 
     return `
@@ -1889,13 +1908,13 @@ function renderResults(r) {
 
   // Stats cards
   const cards = [
-    { key: 'stat_avg_wait',      value: r.avg_wait.toFixed(1), unit: t('stat_unit_min'),    icon: '⏱', cls: 'accent',   desc: t('stat_desc_avg_wait') },
-    { key: 'stat_max_wait',      value: r.max_wait,            unit: t('stat_unit_min'),    icon: '⏰', cls: 'warning',  desc: t('stat_desc_max_wait') },
-    { key: 'stat_peak_queue',    value: r.max_queue_len,       unit: t('stat_unit_groups'), icon: '📊', cls: '',         desc: t('stat_desc_peak_queue') },
-    { key: 'stat_served',        value: r.served,              unit: t('stat_unit_groups'), icon: '✅', cls: 'success',  desc: t('stat_desc_served') },
-    { key: 'stat_table_util',    value: r.table_util.toFixed(1), unit: t('stat_unit_pct'), icon: '🪑', cls: 'accent',   desc: t('stat_desc_table_util') },
-    { key: 'stat_service_level', value: r.service_level.toFixed(1), unit: t('stat_unit_pct'), icon: '⭐', cls: 'success', desc: t('stat_desc_service_level') },
-    { key: 'stat_total_time',    value: r.total_time,          unit: t('stat_unit_min'),    icon: '🕐', cls: '',         desc: t('stat_desc_total_time') },
+    { key: 'stat_avg_wait',      value: r.avg_wait.toFixed(1), unit: t('stat_unit_min'),    icon: '', cls: 'accent',   desc: t('stat_desc_avg_wait') },
+    { key: 'stat_max_wait',      value: r.max_wait,            unit: t('stat_unit_min'),    icon: '', cls: 'warning',  desc: t('stat_desc_max_wait') },
+    { key: 'stat_peak_queue',    value: r.max_queue_len,       unit: t('stat_unit_groups'), icon: '', cls: '',         desc: t('stat_desc_peak_queue') },
+    { key: 'stat_served',        value: r.served,              unit: t('stat_unit_groups'), icon: '', cls: 'success',  desc: t('stat_desc_served') },
+    { key: 'stat_table_util',    value: r.table_util.toFixed(1), unit: t('stat_unit_pct'), icon: '', cls: 'accent',   desc: t('stat_desc_table_util') },
+    { key: 'stat_service_level', value: r.service_level.toFixed(1), unit: t('stat_unit_pct'), icon: '', cls: 'success', desc: t('stat_desc_service_level') },
+    { key: 'stat_total_time',    value: r.total_time,          unit: t('stat_unit_min'),    icon: '', cls: '',         desc: t('stat_desc_total_time') },
   ];
 
   document.getElementById('statsGrid').innerHTML = cards.map(c => `
@@ -1924,7 +1943,7 @@ function renderResults(r) {
             </div>
           </div>
         </td>
-        <td>${c.vip ? '<span class="badge badge-vip">⭐ VIP</span>' : '—'}</td>
+        <td>${c.vip ? '<span class="badge badge-vip">VIP</span>' : '—'}</td>
         <td>${c.wait_time <= 10
           ? `<span class="badge" style="background:var(--success-light);color:var(--success)">${t('row_status_ok')}</span>`
           : `<span class="badge" style="background:var(--warning-light);color:var(--warning)">${t('row_status_late')}</span>`
@@ -1986,7 +2005,7 @@ function renderWaitTimeChart(waitTimes) {
       datasets: [{
         label: t('chart_wait_label'),
         data: Object.values(buckets),
-        backgroundColor: ['#22c55e', '#84cc16', '#eab308', '#f97316', '#ef4444'],
+        backgroundColor: ['#5a7a5a', '#8b9a6b', '#b8860b', '#c96442', '#b44040'],
         borderRadius: 6,
         borderSkipped: false,
       }]
@@ -2012,9 +2031,9 @@ function renderTableUtilChart(tableUtil) {
   if (tableUtil.length === 0) return;
 
   const colors = [
-    '#3b82f6','#8b5cf6','#ec4899','#f97316','#eab308',
-    '#22c55e','#14b8a6','#06b6d4','#6366f1','#f43f5e',
-    '#84cc16','#a855f7','#fb923c','#facc15','#4ade80',
+    '#c96442','#a84f33','#b8860b','#8b9a6b','#5a7a5a',
+    '#d4a574','#9b7653','#c9a96e','#7a6b5d','#b44040',
+    '#e8c4b5','#6b6860','#cec9be','#b45309','#9b9890',
   ];
 
   utilChart = new Chart(ctx, {
