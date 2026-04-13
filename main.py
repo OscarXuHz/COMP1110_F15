@@ -111,7 +111,7 @@ def allocate_reserved_tables(requests: List[Request], tables: List[Table]):
         candidates = [t for t in tables if t.max_people >= req.people]
         #v5.1.2 update NULL pretection
         if not candidates:
-            return False
+            return 
         candidates.sort(key=lambda t: (t.max_people, t.index))  # 按容量从小到大排序
         chosen = None
         for t in candidates:
