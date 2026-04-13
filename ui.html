@@ -1,0 +1,1732 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Restaurant Queue Simulator</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+  /* ── 全局变量 ── */
+  :root {
+    --bg: #f8f7f4;
+    --surface: #ffffff;
+    --surface2: #f3f2ef;
+    --border: #e5e3de;
+    --border2: #d4d2cc;
+    --text: #1a1917;
+    --text2: #6b6860;
+    --text3: #9b9890;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --accent-dark: #1d4ed8;
+    --success: #16a34a;
+    --success-light: #f0fdf4;
+    --warning: #d97706;
+    --warning-light: #fffbeb;
+    --danger: #dc2626;
+    --danger-light: #fef2f2;
+    --gold: #b45309;
+    --gold-light: #fef3c7;
+    --radius: 10px;
+    --radius-lg: 16px;
+    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+    --shadow-md: 0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.05);
+    --shadow-lg: 0 10px 30px rgba(0,0,0,.10), 0 4px 8px rgba(0,0,0,.06);
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  }
+
+  /* ── Reset ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 15px; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh; }
+  button { cursor: pointer; font-family: inherit; }
+  input, select, textarea { font-family: inherit; }
+  a { color: var(--accent); text-decoration: none; }
+
+  /* ── 布局 ── */
+  .app-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: var(--shadow);
+  }
+  .app-header .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+  .app-header .logo .icon {
+    width: 32px; height: 32px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    color: white;
+  }
+  .header-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--text3);
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .app-layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    min-height: calc(100vh - 60px);
+  }
+
+  /* ── 侧边栏 ── */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    position: sticky;
+    top: 60px;
+    height: calc(100vh - 60px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .sidebar-section { padding: 0 16px 8px; }
+  .sidebar-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text3);
+    padding: 0 8px;
+    margin-bottom: 4px;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.15s;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: var(--accent-light); color: var(--accent); font-weight: 600; }
+  .nav-item .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+  .nav-item .nav-badge {
+    margin-left: auto;
+    background: var(--accent);
+    color: white;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 99px;
+    min-width: 20px;
+    text-align: center;
+  }
+  .sidebar-divider { height: 1px; background: var(--border); margin: 12px 16px; }
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 16px;
+    font-size: 0.75rem;
+    color: var(--text3);
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  /* ── 主内容 ── */
+  .main-content {
+    padding: 32px;
+    overflow-y: auto;
+  }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── 页面标题 ── */
+  .page-header {
+    margin-bottom: 28px;
+  }
+  .page-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .page-subtitle {
+    font-size: 0.875rem;
+    color: var(--text2);
+  }
+
+  /* ── 卡片 ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    box-shadow: var(--shadow);
+  }
+  .card + .card { margin-top: 20px; }
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .card-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-title .icon { font-size: 16px; }
+  .card-subtitle {
+    font-size: 0.8rem;
+    color: var(--text3);
+    margin-top: 2px;
+  }
+
+  /* ── 按钮 ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: none;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+  }
+  .btn-primary:hover { background: var(--accent-dark); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,235,.3); }
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { background: var(--border); }
+  .btn-danger {
+    background: var(--danger-light);
+    color: var(--danger);
+    border: 1px solid #fecaca;
+  }
+  .btn-danger:hover { background: #fee2e2; }
+  .btn-success {
+    background: var(--success);
+    color: white;
+  }
+  .btn-success:hover { background: #15803d; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(22,163,74,.3); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text2);
+    border: 1px solid transparent;
+  }
+  .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+  .btn-sm { padding: 5px 10px; font-size: 0.78rem; }
+  .btn-lg { padding: 12px 24px; font-size: 0.95rem; font-weight: 600; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+
+  /* ── 表单 ── */
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 14px;
+  }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text2);
+    letter-spacing: 0.01em;
+  }
+  .form-input {
+    padding: 8px 12px;
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    color: var(--text);
+    background: var(--surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+  }
+  .form-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+  }
+  .form-select {
+    padding: 8px 12px;
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    color: var(--text);
+    background: var(--surface);
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b6860' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+  }
+  .form-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+  .checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    background: var(--surface);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .checkbox-group:hover { border-color: var(--accent); background: var(--accent-light); }
+  .checkbox-group input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+  .checkbox-group label { font-size: 0.875rem; color: var(--text); cursor: pointer; }
+
+  /* ── 餐桌配置 ── */
+  .table-config-list { display: flex; flex-direction: column; gap: 10px; }
+  .table-config-item {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 14px 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: all 0.15s;
+  }
+  .table-config-item:hover { border-color: var(--border2); box-shadow: var(--shadow); }
+  .table-config-item .item-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text3);
+    margin-bottom: 3px;
+  }
+  .config-summary {
+    display: flex;
+    gap: 16px;
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--accent-light);
+    border: 1px solid #bfdbfe;
+    border-radius: var(--radius);
+  }
+  .config-summary-item { font-size: 0.85rem; color: var(--accent); }
+  .config-summary-item strong { font-weight: 700; }
+
+  /* ── 请求表格 ── */
+  .table-wrapper {
+    overflow-x: auto;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.83rem;
+  }
+  thead tr {
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text2);
+    font-size: 0.75rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: middle;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+  .table-input {
+    padding: 4px 8px;
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    font-size: 0.83rem;
+    width: 60px;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .table-input:focus { border-color: var(--accent); }
+  .table-input.wide { width: 120px; }
+  .table-checkbox { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 8px;
+    border-radius: 99px;
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+  .badge-vip { background: var(--gold-light); color: var(--gold); }
+  .badge-reserved { background: var(--accent-light); color: var(--accent); }
+  .badge-miss { background: var(--warning-light); color: var(--warning); }
+  .empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--text3);
+  }
+  .empty-state .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-state p { font-size: 0.875rem; }
+
+  /* ── 预置用例 ── */
+  .preset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+  }
+  .preset-card {
+    padding: 16px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.15s;
+    background: var(--surface);
+    text-align: left;
+  }
+  .preset-card:hover {
+    border-color: var(--accent);
+    background: var(--accent-light);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+  .preset-card .preset-num {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .preset-card .preset-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .preset-card .preset-desc {
+    font-size: 0.78rem;
+    color: var(--text3);
+    line-height: 1.4;
+  }
+  .preset-card .preset-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 8px;
+  }
+  .preset-tag {
+    padding: 1px 6px;
+    border-radius: 99px;
+    font-size: 0.68rem;
+    font-weight: 600;
+  }
+  .tag-vip { background: var(--gold-light); color: var(--gold); }
+  .tag-reserved { background: var(--accent-light); color: var(--accent); }
+  .tag-miss { background: var(--warning-light); color: var(--warning); }
+  .tag-normal { background: var(--surface2); color: var(--text2); }
+
+  /* ── 运行面板 ── */
+  .run-panel {
+    background: linear-gradient(135deg, #1e3a5f 0%, #1d4ed8 100%);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    color: white;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+  }
+  .run-panel h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: 8px; }
+  .run-panel p { font-size: 0.875rem; opacity: 0.8; margin-bottom: 24px; }
+  .run-info {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    margin-bottom: 24px;
+  }
+  .run-info-item { text-align: center; }
+  .run-info-item .val { font-size: 1.8rem; font-weight: 700; line-height: 1; }
+  .run-info-item .lbl { font-size: 0.75rem; opacity: 0.7; margin-top: 4px; }
+  .run-btn {
+    background: white;
+    color: var(--accent);
+    border: none;
+    padding: 14px 40px;
+    border-radius: var(--radius);
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.2);
+  }
+  .run-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,.25); }
+  .run-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2.5px solid rgba(37,99,235,.3);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── 统计卡片 ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    transition: all 0.2s;
+  }
+  .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .stat-card .stat-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text3);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .stat-card .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    color: var(--text);
+  }
+  .stat-card .stat-unit {
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--text3);
+    margin-left: 2px;
+  }
+  .stat-card .stat-desc {
+    font-size: 0.75rem;
+    color: var(--text3);
+    margin-top: 6px;
+  }
+  .stat-card.accent { border-color: #bfdbfe; background: var(--accent-light); }
+  .stat-card.accent .stat-value { color: var(--accent); }
+  .stat-card.success { border-color: #bbf7d0; background: var(--success-light); }
+  .stat-card.success .stat-value { color: var(--success); }
+  .stat-card.warning { border-color: #fde68a; background: var(--warning-light); }
+  .stat-card.warning .stat-value { color: var(--warning); }
+
+  /* ── 图表 ── */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    box-shadow: var(--shadow);
+  }
+  .chart-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .chart-container { position: relative; height: 260px; }
+
+  /* ── 消息提示 ── */
+  .toast-container {
+    position: fixed;
+    top: 72px;
+    right: 24px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+  }
+  .toast {
+    padding: 12px 18px;
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+    font-weight: 500;
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    pointer-events: all;
+    animation: slideIn 0.25s ease;
+    max-width: 320px;
+  }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+  .toast-success { background: var(--success); color: white; }
+  .toast-error { background: var(--danger); color: white; }
+  .toast-info { background: var(--accent); color: white; }
+
+  /* ── 进度条 ── */
+  .progress-bar {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 99px;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 99px;
+    background: var(--accent);
+    transition: width 0.5s ease;
+  }
+
+  /* ── 上传区域 ── */
+  .upload-zone {
+    border: 2px dashed var(--border2);
+    border-radius: var(--radius);
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: var(--surface2);
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-light);
+  }
+  .upload-zone .upload-icon { font-size: 28px; margin-bottom: 8px; }
+  .upload-zone p { font-size: 0.85rem; color: var(--text2); }
+  .upload-zone span { font-size: 0.78rem; color: var(--text3); }
+
+  /* ── 分隔线 ── */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 20px 0;
+  }
+
+  /* ── 工具栏 ── */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .toolbar-spacer { flex: 1; }
+
+  /* ── 结果导出 ── */
+  .export-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    background: var(--success-light);
+    border: 1px solid #bbf7d0;
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+  }
+  .export-bar p { font-size: 0.875rem; color: var(--success); font-weight: 500; }
+
+  /* ── 响应式 ── */
+  @media (max-width: 900px) {
+    .app-layout { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .charts-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 600px) {
+    .main-content { padding: 16px; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .form-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* ── 加载动画 ── */
+  .loading-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(255,255,255,.85);
+    z-index: 500;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .loading-overlay.show { display: flex; }
+  .loading-spinner {
+    width: 48px; height: 48px;
+    border: 4px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .loading-text { font-size: 0.95rem; font-weight: 500; color: var(--text2); }
+
+  /* ── 折叠面板 ── */
+  .collapse-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+  }
+  .collapse-arrow {
+    font-size: 12px;
+    color: var(--text3);
+    transition: transform 0.2s;
+  }
+  .collapse-arrow.open { transform: rotate(180deg); }
+  .collapse-body { overflow: hidden; transition: max-height 0.3s ease; }
+</style>
+</head>
+<body>
+
+<!-- 顶部导航 -->
+<header class="app-header">
+  <div class="logo">
+    <div class="icon">🍽</div>
+    Restaurant Queue Simulator
+  </div>
+  <div class="header-status">
+    <div class="status-dot" id="serverStatus"></div>
+    <span id="serverStatusText">连接中...</span>
+  </div>
+</header>
+
+<div class="app-layout">
+  <!-- 侧边栏 -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">配置</div>
+      <button class="nav-item active" onclick="showPage('tables')" id="nav-tables">
+        <span class="nav-icon">🪑</span> 餐桌配置
+      </button>
+      <button class="nav-item" onclick="showPage('requests')" id="nav-requests">
+        <span class="nav-icon">👥</span> 顾客请求
+        <span class="nav-badge" id="badge-requests">0</span>
+      </button>
+      <button class="nav-item" onclick="showPage('presets')" id="nav-presets">
+        <span class="nav-icon">📂</span> 预置用例
+      </button>
+    </div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">模拟</div>
+      <button class="nav-item" onclick="showPage('run')" id="nav-run">
+        <span class="nav-icon">▶️</span> 运行模拟
+      </button>
+      <button class="nav-item" onclick="showPage('results')" id="nav-results">
+        <span class="nav-icon">📊</span> 模拟结果
+      </button>
+    </div>
+    <div class="sidebar-footer">
+      COMP1110 Group Project<br>
+      Restaurant Queue Simulator
+    </div>
+  </aside>
+
+  <!-- 主内容 -->
+  <main class="main-content">
+
+    <!-- ── 页面：餐桌配置 ── -->
+    <div class="page active" id="page-tables">
+      <div class="page-header">
+        <div class="page-title">🪑 餐桌配置</div>
+        <div class="page-subtitle">定义餐厅的桌型种类、数量和座位容量</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title"><span class="icon">📋</span> 当前桌型配置</div>
+            <div class="card-subtitle">每行代表一种桌型，可自由增减</div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="addTableType()">+ 添加桌型</button>
+        </div>
+
+        <div class="table-config-list" id="tableConfigList"></div>
+
+        <div class="config-summary" id="configSummary">
+          <div class="config-summary-item">总桌数：<strong id="totalTables">0</strong> 张</div>
+          <div class="config-summary-item">总容量：<strong id="totalCapacity">0</strong> 人</div>
+          <div class="config-summary-item">桌型种数：<strong id="totalTypes">0</strong> 种</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="card-title" style="margin-bottom:12px;"><span class="icon">⚡</span> 快速预设</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-secondary btn-sm" onclick="applyPresetTables('default')">默认配置（5×2座 + 3×4座 + 2×6座 + 1×8座）</button>
+          <button class="btn btn-secondary btn-sm" onclick="applyPresetTables('small')">小型餐厅（3×2座 + 2×4座）</button>
+          <button class="btn btn-secondary btn-sm" onclick="applyPresetTables('large')">大型餐厅（8×2座 + 5×4座 + 3×6座 + 2×8座）</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 页面：顾客请求 ── -->
+    <div class="page" id="page-requests">
+      <div class="page-header">
+        <div class="page-title">👥 顾客请求</div>
+        <div class="page-subtitle">手动添加或批量导入顾客请求数据</div>
+      </div>
+
+      <!-- 添加表单 -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">✏️</span> 添加新请求</div>
+        </div>
+        <div class="form-grid" id="addRequestForm">
+          <div class="form-group">
+            <label class="form-label">人数 *</label>
+            <input type="number" class="form-input" id="f_people" min="1" max="12" value="2" placeholder="1-12">
+          </div>
+          <div class="form-group">
+            <label class="form-label">到达时间 * <small style="color:var(--text3)">(YYYYMMDDHHmmss)</small></label>
+            <input type="text" class="form-input" id="f_arrival" value="20260101120000" placeholder="20260101120000">
+          </div>
+          <div class="form-group">
+            <label class="form-label">用餐时长（分钟）*</label>
+            <input type="number" class="form-input" id="f_duration" min="1" value="30" placeholder="30">
+          </div>
+          <div class="form-group">
+            <label class="form-label">拼桌意愿</label>
+            <select class="form-select" id="f_share">
+              <option value="1">愿意拼桌</option>
+              <option value="0">不愿拼桌</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">过号</label>
+            <select class="form-select" id="f_miss">
+              <option value="0">否</option>
+              <option value="1">是</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">过号后返回</label>
+            <select class="form-select" id="f_comeback">
+              <option value="0">否</option>
+              <option value="1">是</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">VIP</label>
+            <select class="form-select" id="f_vip">
+              <option value="0">否</option>
+              <option value="1">是</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">预订</label>
+            <select class="form-select" id="f_reserved">
+              <option value="0">否</option>
+              <option value="1">是</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:16px;display:flex;gap:8px;">
+          <button class="btn btn-primary" onclick="addRequest()">+ 添加请求</button>
+          <button class="btn btn-secondary" onclick="clearForm()">重置表单</button>
+        </div>
+      </div>
+
+      <!-- CSV 导入 -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">📁</span> CSV 批量导入</div>
+        </div>
+        <div class="upload-zone" id="uploadZone" onclick="document.getElementById('csvFileInput').click()"
+             ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+          <div class="upload-icon">📤</div>
+          <p>点击选择 CSV 文件，或将文件拖拽到此处</p>
+          <span>格式：index,people,arrival,duration,share,miss,comeback,vip,reserved</span>
+        </div>
+        <input type="file" id="csvFileInput" accept=".csv" style="display:none" onchange="importCSV(event)">
+      </div>
+
+      <!-- 请求列表 -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title"><span class="icon">📋</span> 请求列表</div>
+            <div class="card-subtitle" id="requestCount">共 0 条请求</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary btn-sm" onclick="exportRequestsCSV()">⬇ 导出 CSV</button>
+            <button class="btn btn-danger btn-sm" onclick="clearAllRequests()">🗑 清空全部</button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>人数</th>
+                <th>到达时间</th>
+                <th>时长(分)</th>
+                <th>拼桌</th>
+                <th>过号</th>
+                <th>返回</th>
+                <th>VIP</th>
+                <th>预订</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="requestTableBody">
+              <tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📭</div><p>暂无请求数据，请添加或导入</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 页面：预置用例 ── -->
+    <div class="page" id="page-presets">
+      <div class="page-header">
+        <div class="page-title">📂 预置测试用例</div>
+        <div class="page-subtitle">一键加载项目中的 request1.csv ~ request10.csv 测试数据</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">🗂</span> 可用测试用例</div>
+          <button class="btn btn-secondary btn-sm" onclick="loadPresets()">🔄 刷新</button>
+        </div>
+        <div class="preset-grid" id="presetGrid">
+          <div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--text3);">
+            <div style="font-size:32px;margin-bottom:8px;">⏳</div>
+            <p>正在加载预置用例...</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:20px;">
+        <div class="card-title" style="margin-bottom:8px;"><span class="icon">ℹ️</span> 加载说明</div>
+        <p style="font-size:0.85rem;color:var(--text2);line-height:1.7;">
+          点击任意用例卡片，系统将自动将该用例的顾客请求数据加载到「顾客请求」页面。<br>
+          若该用例同时存在对应的 <code style="background:var(--surface2);padding:1px 5px;border-radius:4px;">restaurant{n}.csv</code> 文件，
+          餐桌配置也会同步更新。<br>
+          加载后可在「顾客请求」页面查看和编辑数据，然后前往「运行模拟」执行。
+        </p>
+      </div>
+    </div>
+
+    <!-- ── 页面：运行模拟 ── -->
+    <div class="page" id="page-run">
+      <div class="page-header">
+        <div class="page-title">▶️ 运行模拟</div>
+        <div class="page-subtitle">检查配置并运行餐厅排队模拟</div>
+      </div>
+
+      <div class="run-panel">
+        <h2>🍽 Restaurant Queue Simulator</h2>
+        <p>基于事件驱动的餐厅排队模拟引擎，支持 VIP 优先、拼桌、预订、过号等复杂场景</p>
+        <div class="run-info">
+          <div class="run-info-item">
+            <div class="val" id="runInfoTables">0</div>
+            <div class="lbl">张桌子</div>
+          </div>
+          <div class="run-info-item">
+            <div class="val" id="runInfoRequests">0</div>
+            <div class="lbl">条请求</div>
+          </div>
+          <div class="run-info-item">
+            <div class="val" id="runInfoCapacity">0</div>
+            <div class="lbl">总座位</div>
+          </div>
+        </div>
+        <button class="run-btn" id="runBtn" onclick="runSimulation()">
+          <div class="spinner" id="runSpinner"></div>
+          <span id="runBtnText">▶ 开始模拟</span>
+        </button>
+      </div>
+
+      <!-- 配置预览 -->
+      <div class="card" style="margin-top:20px;">
+        <div class="card-title" style="margin-bottom:16px;"><span class="icon">🔍</span> 当前配置预览</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div>
+            <div style="font-size:0.8rem;font-weight:600;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">餐桌配置</div>
+            <div id="runPreviewTables" style="font-size:0.875rem;color:var(--text2);"></div>
+          </div>
+          <div>
+            <div style="font-size:0.8rem;font-weight:600;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">请求摘要</div>
+            <div id="runPreviewRequests" style="font-size:0.875rem;color:var(--text2);"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 页面：模拟结果 ── -->
+    <div class="page" id="page-results">
+      <div class="page-header">
+        <div class="page-title">📊 模拟结果</div>
+        <div class="page-subtitle">统计指标、等待时间分布与桌子利用率可视化</div>
+      </div>
+
+      <div id="noResults" style="text-align:center;padding:64px 24px;color:var(--text3);">
+        <div style="font-size:48px;margin-bottom:16px;">📊</div>
+        <p style="font-size:1rem;font-weight:500;margin-bottom:8px;">暂无模拟结果</p>
+        <p style="font-size:0.875rem;">请先配置餐桌和顾客请求，然后前往「运行模拟」执行</p>
+        <button class="btn btn-primary" style="margin-top:20px;" onclick="showPage('run')">前往运行模拟</button>
+      </div>
+
+      <div id="resultsContent" style="display:none;">
+        <!-- 导出栏 -->
+        <div class="export-bar">
+          <p>✅ 模拟完成！结果已就绪</p>
+          <button class="btn btn-success btn-sm" onclick="exportResults()">⬇ 导出完整结果 CSV</button>
+        </div>
+
+        <!-- 统计卡片 -->
+        <div class="stats-grid" id="statsGrid"></div>
+
+        <!-- 图表 -->
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-title">📈 等待时间分布</div>
+            <div class="chart-container">
+              <canvas id="waitTimeChart"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">🥧 桌子利用率</div>
+            <div class="chart-container">
+              <canvas id="tableUtilChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- 详细数据 -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><span class="icon">📋</span> 每位顾客等待时间明细</div>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>请求编号</th>
+                  <th>人数</th>
+                  <th>等待时间（分钟）</th>
+                  <th>VIP</th>
+                  <th>状态</th>
+                </tr>
+              </thead>
+              <tbody id="waitTimeTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 桌子利用率明细 -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><span class="icon">🪑</span> 每张桌子利用率明细</div>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>桌子编号</th>
+                  <th>座位容量</th>
+                  <th>利用率</th>
+                  <th>占用时长（分钟）</th>
+                </tr>
+              </thead>
+              <tbody id="tableUtilTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Toast 容器 -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- 加载遮罩 -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">正在运行模拟，请稍候...</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  全局状态
+// ═══════════════════════════════════════════════════════════
+const state = {
+  tableConfig: [
+    { count: 5, capacity: 2 },
+    { count: 3, capacity: 4 },
+    { count: 2, capacity: 6 },
+    { count: 1, capacity: 8 },
+  ],
+  requests: [],
+  results: null,
+  nextRequestIndex: 1,
+};
+
+let waitChart = null;
+let utilChart = null;
+
+// ═══════════════════════════════════════════════════════════
+//  页面导航
+// ═══════════════════════════════════════════════════════════
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+
+  if (name === 'run') updateRunPreview();
+  if (name === 'results' && state.results) renderResults(state.results);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Toast 通知
+// ═══════════════════════════════════════════════════════════
+function toast(msg, type = 'info', duration = 3000) {
+  const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.innerHTML = `<span>${icons[type]}</span><span>${msg}</span>`;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), duration);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  服务器状态检测
+// ═══════════════════════════════════════════════════════════
+async function checkServer() {
+  try {
+    const r = await fetch('/api/presets', { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      document.getElementById('serverStatus').style.background = 'var(--success)';
+      document.getElementById('serverStatusText').textContent = '服务器已连接';
+      return true;
+    }
+  } catch {}
+  document.getElementById('serverStatus').style.background = 'var(--danger)';
+  document.getElementById('serverStatusText').textContent = '服务器未连接';
+  return false;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  餐桌配置
+// ═══════════════════════════════════════════════════════════
+function renderTableConfig() {
+  const list = document.getElementById('tableConfigList');
+  if (state.tableConfig.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3);">暂无桌型，请点击「添加桌型」</div>';
+  } else {
+    list.innerHTML = state.tableConfig.map((item, i) => `
+      <div class="table-config-item">
+        <div>
+          <div class="item-label">数量（张）</div>
+          <input type="number" class="form-input" min="1" max="50" value="${item.count}"
+            onchange="updateTableConfig(${i}, 'count', this.value)">
+        </div>
+        <div>
+          <div class="item-label">座位容量（人/桌）</div>
+          <input type="number" class="form-input" min="1" max="20" value="${item.capacity}"
+            onchange="updateTableConfig(${i}, 'capacity', this.value)">
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="removeTableType(${i})">🗑</button>
+      </div>
+    `).join('');
+  }
+  updateConfigSummary();
+}
+
+function updateTableConfig(index, field, value) {
+  state.tableConfig[index][field] = parseInt(value) || 1;
+  updateConfigSummary();
+}
+
+function addTableType() {
+  state.tableConfig.push({ count: 2, capacity: 4 });
+  renderTableConfig();
+}
+
+function removeTableType(index) {
+  state.tableConfig.splice(index, 1);
+  renderTableConfig();
+}
+
+function updateConfigSummary() {
+  const total = state.tableConfig.reduce((s, i) => s + i.count, 0);
+  const cap = state.tableConfig.reduce((s, i) => s + i.count * i.capacity, 0);
+  document.getElementById('totalTables').textContent = total;
+  document.getElementById('totalCapacity').textContent = cap;
+  document.getElementById('totalTypes').textContent = state.tableConfig.length;
+}
+
+function applyPresetTables(type) {
+  const presets = {
+    default: [{ count:5, capacity:2 }, { count:3, capacity:4 }, { count:2, capacity:6 }, { count:1, capacity:8 }],
+    small:   [{ count:3, capacity:2 }, { count:2, capacity:4 }],
+    large:   [{ count:8, capacity:2 }, { count:5, capacity:4 }, { count:3, capacity:6 }, { count:2, capacity:8 }],
+  };
+  state.tableConfig = presets[type].map(p => ({ ...p }));
+  renderTableConfig();
+  toast('餐桌配置已更新', 'success');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  顾客请求
+// ═══════════════════════════════════════════════════════════
+function renderRequests() {
+  const tbody = document.getElementById('requestTableBody');
+  document.getElementById('requestCount').textContent = `共 ${state.requests.length} 条请求`;
+  document.getElementById('badge-requests').textContent = state.requests.length;
+
+  if (state.requests.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📭</div><p>暂无请求数据，请添加或导入</p></div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = state.requests.map((r, i) => `
+    <tr>
+      <td><code style="font-family:var(--mono);font-size:0.8rem">${r.index}</code></td>
+      <td><input type="number" class="table-input" min="1" max="20" value="${r.people}" onchange="updateRequest(${i},'people',this.value)"></td>
+      <td><input type="text" class="table-input wide" value="${r.arrival}" onchange="updateRequest(${i},'arrival',this.value)"></td>
+      <td><input type="number" class="table-input" min="1" value="${r.duration}" onchange="updateRequest(${i},'duration',this.value)"></td>
+      <td><input type="checkbox" class="table-checkbox" ${r.share ? 'checked' : ''} onchange="updateRequest(${i},'share',this.checked?1:0)"></td>
+      <td><input type="checkbox" class="table-checkbox" ${r.miss ? 'checked' : ''} onchange="updateRequest(${i},'miss',this.checked?1:0)"></td>
+      <td><input type="checkbox" class="table-checkbox" ${r.comeback ? 'checked' : ''} onchange="updateRequest(${i},'comeback',this.checked?1:0)"></td>
+      <td><input type="checkbox" class="table-checkbox" ${r.vip ? 'checked' : ''} onchange="updateRequest(${i},'vip',this.checked?1:0)"></td>
+      <td><input type="checkbox" class="table-checkbox" ${r.reserved ? 'checked' : ''} onchange="updateRequest(${i},'reserved',this.checked?1:0)"></td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteRequest(${i})">删除</button></td>
+    </tr>
+  `).join('');
+}
+
+function addRequest() {
+  const arrival = document.getElementById('f_arrival').value.trim();
+  const people = parseInt(document.getElementById('f_people').value);
+  const duration = parseInt(document.getElementById('f_duration').value);
+
+  if (!arrival || !/^\d{14}$/.test(arrival)) {
+    toast('到达时间格式不正确，请使用 YYYYMMDDHHmmss 格式', 'error');
+    return;
+  }
+  if (!people || people < 1) { toast('人数必须大于 0', 'error'); return; }
+  if (!duration || duration < 1) { toast('用餐时长必须大于 0', 'error'); return; }
+
+  const req = {
+    index: state.nextRequestIndex++,
+    people,
+    arrival,
+    duration,
+    share: parseInt(document.getElementById('f_share').value),
+    miss: parseInt(document.getElementById('f_miss').value),
+    comeback: parseInt(document.getElementById('f_comeback').value),
+    vip: parseInt(document.getElementById('f_vip').value),
+    reserved: parseInt(document.getElementById('f_reserved').value),
+  };
+  state.requests.push(req);
+  renderRequests();
+  toast(`已添加请求 #${req.index}`, 'success');
+}
+
+function clearForm() {
+  document.getElementById('f_people').value = '2';
+  document.getElementById('f_arrival').value = '20260101120000';
+  document.getElementById('f_duration').value = '30';
+  document.getElementById('f_share').value = '1';
+  document.getElementById('f_miss').value = '0';
+  document.getElementById('f_comeback').value = '0';
+  document.getElementById('f_vip').value = '0';
+  document.getElementById('f_reserved').value = '0';
+}
+
+function updateRequest(index, field, value) {
+  state.requests[index][field] = typeof value === 'string' && field !== 'arrival' ? parseInt(value) : value;
+}
+
+function deleteRequest(index) {
+  state.requests.splice(index, 1);
+  renderRequests();
+}
+
+function clearAllRequests() {
+  if (state.requests.length === 0) return;
+  if (!confirm(`确定要清空全部 ${state.requests.length} 条请求吗？`)) return;
+  state.requests = [];
+  state.nextRequestIndex = 1;
+  renderRequests();
+  toast('已清空所有请求', 'info');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CSV 导入
+// ═══════════════════════════════════════════════════════════
+function parseCSVLine(line) {
+  const parts = line.trim().split(',');
+  if (parts.length < 9) return null;
+  const [idx, peo, arr, dur, share, miss, comeback, vip, res] = parts;
+  return {
+    index: parseInt(idx),
+    people: parseInt(peo),
+    arrival: arr.trim(),
+    duration: parseInt(dur),
+    share: parseInt(share),
+    miss: parseInt(miss),
+    comeback: parseInt(comeback),
+    vip: parseInt(vip),
+    reserved: parseInt(res),
+  };
+}
+
+function importCSVText(text, replace = false) {
+  const lines = text.split('\n').filter(l => l.trim());
+  const parsed = lines.map(parseCSVLine).filter(Boolean);
+  if (parsed.length === 0) { toast('CSV 文件为空或格式不正确', 'error'); return; }
+
+  if (replace) {
+    state.requests = parsed;
+    state.nextRequestIndex = Math.max(...parsed.map(r => r.index)) + 1;
+  } else {
+    const offset = state.requests.length > 0 ? Math.max(...state.requests.map(r => r.index)) : 0;
+    parsed.forEach(r => {
+      r.index = r.index + offset;
+      state.requests.push(r);
+    });
+    state.nextRequestIndex = Math.max(...state.requests.map(r => r.index)) + 1;
+  }
+  renderRequests();
+  toast(`已导入 ${parsed.length} 条请求`, 'success');
+}
+
+function importCSV(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => importCSVText(e.target.result, false);
+  reader.readAsText(file, 'utf-8');
+  event.target.value = '';
+}
+
+function handleDragOver(e) { e.preventDefault(); document.getElementById('uploadZone').classList.add('drag-over'); }
+function handleDragLeave(e) { document.getElementById('uploadZone').classList.remove('drag-over'); }
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (!file || !file.name.endsWith('.csv')) { toast('请上传 .csv 文件', 'error'); return; }
+  const reader = new FileReader();
+  reader.onload = ev => importCSVText(ev.target.result, false);
+  reader.readAsText(file, 'utf-8');
+}
+
+function exportRequestsCSV() {
+  if (state.requests.length === 0) { toast('没有请求数据可导出', 'error'); return; }
+  const lines = state.requests.map(r =>
+    `${r.index},${r.people},${r.arrival},${r.duration},${r.share},${r.miss},${r.comeback},${r.vip},${r.reserved}`
+  );
+  downloadText(lines.join('\n'), 'requests.csv');
+  toast('请求数据已导出', 'success');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  预置用例
+// ═══════════════════════════════════════════════════════════
+async function loadPresets() {
+  const grid = document.getElementById('presetGrid');
+  grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--text3);"><div style="font-size:32px;margin-bottom:8px;">⏳</div><p>正在加载...</p></div>';
+
+  try {
+    const r = await fetch('/api/presets');
+    const data = await r.json();
+    if (!data.success) throw new Error(data.error);
+
+    if (data.presets.length === 0) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--text3);"><div style="font-size:32px;margin-bottom:8px;">📭</div><p>未找到预置用例文件，请确保 request1.csv ~ request10.csv 在同一目录下</p></div>';
+      return;
+    }
+
+    grid.innerHTML = data.presets.map(p => {
+      const hasVip = p.requests.some(r => r.vip);
+      const hasReserved = p.requests.some(r => r.reserved);
+      const hasMiss = p.requests.some(r => r.miss);
+      const tags = [
+        hasVip ? '<span class="preset-tag tag-vip">⭐ VIP</span>' : '',
+        hasReserved ? '<span class="preset-tag tag-reserved">📅 预订</span>' : '',
+        hasMiss ? '<span class="preset-tag tag-miss">⚠️ 过号</span>' : '',
+        `<span class="preset-tag tag-normal">${p.requests.length} 条</span>`,
+      ].filter(Boolean).join('');
+
+      return `
+        <div class="preset-card" onclick="loadPreset(${p.id})">
+          <div class="preset-num">Test Case ${p.id}</div>
+          <div class="preset-name">${p.name}</div>
+          <div class="preset-desc">${p.description}</div>
+          <div class="preset-tags">${tags}</div>
+        </div>
+      `;
+    }).join('');
+
+    // 存储预置数据
+    window._presets = data.presets;
+  } catch (e) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--danger);">
+      <div style="font-size:32px;margin-bottom:8px;">❌</div>
+      <p>加载失败：${e.message}</p>
+      <p style="font-size:0.8rem;margin-top:8px;color:var(--text3);">请确保 app.py 正在运行</p>
+    </div>`;
+  }
+}
+
+function loadPreset(id) {
+  const preset = (window._presets || []).find(p => p.id === id);
+  if (!preset) { toast('找不到该预置用例', 'error'); return; }
+
+  // 加载请求
+  state.requests = preset.requests.map(r => ({ ...r }));
+  state.nextRequestIndex = Math.max(...state.requests.map(r => r.index)) + 1;
+  renderRequests();
+
+  // 加载餐桌配置（若有）
+  if (preset.tableConfig && preset.tableConfig.length > 0) {
+    state.tableConfig = preset.tableConfig.map(t => ({ ...t }));
+    renderTableConfig();
+    toast(`已加载 Request ${id}（含餐桌配置）`, 'success');
+  } else {
+    toast(`已加载 Request ${id}（${state.requests.length} 条请求）`, 'success');
+  }
+
+  showPage('requests');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  运行模拟
+// ═══════════════════════════════════════════════════════════
+function updateRunPreview() {
+  const totalTables = state.tableConfig.reduce((s, i) => s + i.count, 0);
+  const totalCap = state.tableConfig.reduce((s, i) => s + i.count * i.capacity, 0);
+  document.getElementById('runInfoTables').textContent = totalTables;
+  document.getElementById('runInfoRequests').textContent = state.requests.length;
+  document.getElementById('runInfoCapacity').textContent = totalCap;
+
+  const tablePreview = state.tableConfig.length > 0
+    ? state.tableConfig.map(t => `${t.count} × ${t.capacity}座`).join('<br>')
+    : '<span style="color:var(--text3)">未配置</span>';
+  document.getElementById('runPreviewTables').innerHTML = tablePreview;
+
+  if (state.requests.length > 0) {
+    const vipCount = state.requests.filter(r => r.vip).length;
+    const resCount = state.requests.filter(r => r.reserved).length;
+    const missCount = state.requests.filter(r => r.miss).length;
+    document.getElementById('runPreviewRequests').innerHTML =
+      `总计 ${state.requests.length} 条<br>VIP：${vipCount} 条 · 预订：${resCount} 条 · 过号：${missCount} 条`;
+  } else {
+    document.getElementById('runPreviewRequests').innerHTML = '<span style="color:var(--text3)">未添加请求</span>';
+  }
+}
+
+async function runSimulation() {
+  if (state.tableConfig.length === 0) { toast('请先配置餐桌', 'error'); return; }
+  if (state.requests.length === 0) { toast('请先添加顾客请求', 'error'); return; }
+
+  const btn = document.getElementById('runBtn');
+  const spinner = document.getElementById('runSpinner');
+  const btnText = document.getElementById('runBtnText');
+  btn.disabled = true;
+  spinner.style.display = 'block';
+  btnText.textContent = '运行中...';
+  document.getElementById('loadingOverlay').classList.add('show');
+
+  try {
+    const resp = await fetch('/api/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tableConfig: state.tableConfig,
+        requests: state.requests,
+      }),
+    });
+    const data = await resp.json();
+
+    if (!data.success) throw new Error(data.error || '模拟失败');
+
+    state.results = data.results;
+    renderResults(data.results);
+    showPage('results');
+    toast('模拟完成！', 'success');
+  } catch (e) {
+    toast('模拟失败：' + e.message, 'error', 6000);
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    spinner.style.display = 'none';
+    btnText.textContent = '▶ 开始模拟';
+    document.getElementById('loadingOverlay').classList.remove('show');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  渲染结果
+// ═══════════════════════════════════════════════════════════
+function renderResults(r) {
+  document.getElementById('noResults').style.display = 'none';
+  document.getElementById('resultsContent').style.display = 'block';
+
+  // 统计卡片
+  const cards = [
+    { label: '平均等待时间', value: r.avg_wait.toFixed(1), unit: '分钟', icon: '⏱', cls: 'accent', desc: '所有已服务顾客的平均等待时长' },
+    { label: '最大等待时间', value: r.max_wait, unit: '分钟', icon: '⏰', cls: 'warning', desc: '单个顾客的最长等待时长' },
+    { label: '峰值队列长度', value: r.max_queue_len, unit: '组', icon: '📊', cls: '', desc: '同时等待人数的历史峰值' },
+    { label: '服务组数', value: r.served, unit: '组', icon: '✅', cls: 'success', desc: '成功入座的顾客总组数' },
+    { label: '桌子利用率', value: r.table_util.toFixed(1), unit: '%', icon: '🪑', cls: 'accent', desc: '所有桌子的平均占用率' },
+    { label: '服务水平', value: r.service_level.toFixed(1), unit: '%', icon: '⭐', cls: 'success', desc: '10分钟内入座的顾客比例' },
+    { label: '总模拟时长', value: r.total_time, unit: '分钟', icon: '🕐', cls: '', desc: '从首位顾客到达到最后一位离开' },
+  ];
+
+  document.getElementById('statsGrid').innerHTML = cards.map(c => `
+    <div class="stat-card ${c.cls}">
+      <div class="stat-label">${c.icon} ${c.label}</div>
+      <div class="stat-value">${c.value}<span class="stat-unit">${c.unit}</span></div>
+      <div class="stat-desc">${c.desc}</div>
+    </div>
+  `).join('');
+
+  // 等待时间分布图
+  renderWaitTimeChart(r.customer_wait_times || []);
+
+  // 桌子利用率图
+  renderTableUtilChart(r.per_table_utilization || []);
+
+  // 等待时间明细表
+  const waitBody = document.getElementById('waitTimeTable');
+  if (r.customer_wait_times && r.customer_wait_times.length > 0) {
+    waitBody.innerHTML = r.customer_wait_times.map(c => `
+      <tr>
+        <td><code style="font-family:var(--mono);font-size:0.8rem">#${c.index}</code></td>
+        <td>${c.people} 人</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-weight:600">${c.wait_time}</span>
+            <div class="progress-bar" style="flex:1;min-width:60px;">
+              <div class="progress-fill" style="width:${Math.min(100, c.wait_time / (r.max_wait || 1) * 100)}%;background:${c.wait_time <= 10 ? 'var(--success)' : c.wait_time <= 20 ? 'var(--warning)' : 'var(--danger)'}"></div>
+            </div>
+          </div>
+        </td>
+        <td>${c.vip ? '<span class="badge badge-vip">⭐ VIP</span>' : '—'}</td>
+        <td>${c.wait_time <= 10 ? '<span class="badge" style="background:var(--success-light);color:var(--success)">✅ 达标</span>' : '<span class="badge" style="background:var(--warning-light);color:var(--warning)">⚠️ 超时</span>'}</td>
+      </tr>
+    `).join('');
+  } else {
+    waitBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:24px;">暂无数据</td></tr>';
+  }
+
+  // 桌子利用率明细表
+  const utilBody = document.getElementById('tableUtilTable');
+  if (r.per_table_utilization && r.per_table_utilization.length > 0) {
+    utilBody.innerHTML = r.per_table_utilization.map(t => `
+      <tr>
+        <td><code style="font-family:var(--mono);font-size:0.8rem">桌 ${t.table_id}</code></td>
+        <td>${t.capacity} 座</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-weight:600">${t.utilization}%</span>
+            <div class="progress-bar" style="flex:1;min-width:80px;">
+              <div class="progress-fill" style="width:${t.utilization}%;background:${t.utilization >= 70 ? 'var(--success)' : t.utilization >= 40 ? 'var(--warning)' : 'var(--danger)'}"></div>
+            </div>
+          </div>
+        </td>
+        <td>${t.busy_time} 分钟</td>
+      </tr>
+    `).join('');
+  } else {
+    utilBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:24px;">暂无数据</td></tr>';
+  }
+}
+
+function renderWaitTimeChart(waitTimes) {
+  const ctx = document.getElementById('waitTimeChart').getContext('2d');
+  if (waitChart) waitChart.destroy();
+
+  if (waitTimes.length === 0) return;
+
+  // 按等待时间分组（0-5, 5-10, 10-15, 15-20, 20+）
+  const buckets = { '0-5分': 0, '5-10分': 0, '10-15分': 0, '15-20分': 0, '20分+': 0 };
+  waitTimes.forEach(c => {
+    if (c.wait_time <= 5) buckets['0-5分']++;
+    else if (c.wait_time <= 10) buckets['5-10分']++;
+    else if (c.wait_time <= 15) buckets['10-15分']++;
+    else if (c.wait_time <= 20) buckets['15-20分']++;
+    else buckets['20分+']++;
+  });
+
+  waitChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: Object.keys(buckets),
+      datasets: [{
+        label: '顾客组数',
+        data: Object.values(buckets),
+        backgroundColor: ['#22c55e', '#84cc16', '#eab308', '#f97316', '#ef4444'],
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y} 组` } }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f0ede8' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+function renderTableUtilChart(tableUtil) {
+  const ctx = document.getElementById('tableUtilChart').getContext('2d');
+  if (utilChart) utilChart.destroy();
+
+  if (tableUtil.length === 0) return;
+
+  const colors = [
+    '#3b82f6','#8b5cf6','#ec4899','#f97316','#eab308',
+    '#22c55e','#14b8a6','#06b6d4','#6366f1','#f43f5e',
+    '#84cc16','#a855f7','#fb923c','#facc15','#4ade80',
+  ];
+
+  utilChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: tableUtil.map(t => `桌${t.table_id}(${t.capacity}座)`),
+      datasets: [{
+        data: tableUtil.map(t => t.utilization),
+        backgroundColor: tableUtil.map((_, i) => colors[i % colors.length]),
+        borderWidth: 2,
+        borderColor: '#fff',
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { font: { size: 11 }, padding: 8, boxWidth: 12 }
+        },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed.toFixed(1)}%` } }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  导出结果
+// ═══════════════════════════════════════════════════════════
+async function exportResults() {
+  if (!state.results) { toast('没有结果可导出', 'error'); return; }
+
+  try {
+    const resp = await fetch('/api/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ results: state.results, requests: state.requests }),
+    });
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'simulation_results.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('结果已导出', 'success');
+  } catch (e) {
+    toast('导出失败：' + e.message, 'error');
+  }
+}
+
+function downloadText(text, filename) {
+  const blob = new Blob(['\uFEFF' + text], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  初始化
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', async () => {
+  renderTableConfig();
+  renderRequests();
+  await checkServer();
+  await loadPresets();
+});
+</script>
+</body>
+</html>
