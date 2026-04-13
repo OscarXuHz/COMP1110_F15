@@ -344,7 +344,12 @@ def main():
     requests = load_requests('requests.csv')
 
     # 餐桌配置
-    table_config = [(5,2), (3,4), (2,6), (1,8)]  # (数量, 容量)
+    table_config = []
+    with open('restaurant.csv', 'r') as f:
+        for line in f:
+            parts = line.strip().split(',')
+            if len(parts) >= 2:
+                table_config.append((int(parts[0]), int(parts[1])))
     tables = []
     for count, cap in table_config:
         for _ in range(count):
