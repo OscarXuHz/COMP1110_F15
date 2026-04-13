@@ -212,26 +212,19 @@ def api_presets():
             except Exception:
                 pass
 
-        # 生成描述
+        # 返回结构化元数据，由前端根据语言动态生成描述
         n = len(requests_data)
         has_vip = any(r["vip"] for r in requests_data)
         has_reserved = any(r["reserved"] for r in requests_data)
         has_miss = any(r["miss"] for r in requests_data)
-        tags = []
-        if has_vip:
-            tags.append("VIP")
-        if has_reserved:
-            tags.append("预订")
-        if has_miss:
-            tags.append("过号")
-        desc = f"{n} 条请求"
-        if tags:
-            desc += " · " + " / ".join(tags)
 
         presets.append({
             "id": i,
             "name": f"Request {i}",
-            "description": desc,
+            "count": n,
+            "hasVip": has_vip,
+            "hasReserved": has_reserved,
+            "hasMiss": has_miss,
             "requests": requests_data,
             "tableConfig": table_config,
         })
