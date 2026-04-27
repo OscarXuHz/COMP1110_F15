@@ -1,9 +1,9 @@
 Simulation Result:
 ------------------
-Average Wait Time: 0.0 min
-Max Wait Time: 0 min
-Peak Queue Length: 0
-Groups Served: 3
-Table Utilization: 257.1%
-Service Level (seated within 10 min): 100.0%
-Total Time: 35 min
+Average Wait Time: 18.3 min
+Max Wait Time: 40 min
+Peak Queue Length: 6
+Groups Served: 9
+Table Utilization: 100.0%
+Service Level (seated within 10 min): 33.3%
+Total Time: 85 min
