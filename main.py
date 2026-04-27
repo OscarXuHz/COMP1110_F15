@@ -73,27 +73,58 @@ def parse_time(t_str: str) -> int:
     return int(dt.timestamp() / 60)
 
 def load_requests(filename: str) -> List[Request]:
-    """Load requests from CSV file"""
+    """Load requests from CSV file (9 columns, no header)."""
     requests = []
-    with open(filename, 'r') as f:
-        for line in f:
-            parts = line.strip().split(',')
-            if len(parts) < 9:
+    with open(filename, 'r', encoding='utf-8') as f:
+        for lineno, line in enumerate(f, 1):
+            line = line.strip()
+            if not line or line.startswith('#'):
                 continue
-            idx, peo, arr, dur, share, miss, comeback, vip, res = parts
-            req = Request(
-                index=int(idx),
-                people=int(peo),
-                arrival=parse_time(arr),
-                duration=int(dur),
-                share=int(share),
-                miss=int(miss),
-                comeback=int(comeback),
-                vip=int(vip),
-                reserved=int(res)
-            )
-            requests.append(req)
+            parts = line.split(',')
+            if len(parts) < 9:
+                print(f"  [warning] line {lineno} skipped (expected 9 columns, got {len(parts)})")
+                continue
+            try:
+                idx, peo, arr, dur, share, miss, comeback, vip, res = parts[:9]
+                req = Request(
+                    index=int(idx),
+                    people=int(peo),
+                    arrival=parse_time(arr.strip()),
+                    duration=int(dur),
+                    share=int(share),
+                    miss=int(miss),
+                    comeback=int(comeback),
+                    vip=int(vip),
+                    reserved=int(res)
+                )
+                requests.append(req)
+            except (ValueError, Exception) as e:
+                print(f"  [warning] line {lineno} skipped ({e})")
     return requests
+
+
+def load_restaurant(filename: str) -> List[Table]:
+    """Load table configuration from CSV file (2 columns: count,capacity, no header)."""
+    tables: List[Table] = []
+    with open(filename, 'r', encoding='utf-8') as f:
+        for lineno, line in enumerate(f, 1):
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            parts = line.split(',')
+            if len(parts) < 2:
+                print(f"  [warning] line {lineno} skipped (expected 2 columns, got {len(parts)})")
+                continue
+            try:
+                count, capacity = int(parts[0]), int(parts[1])
+                if count <= 0 or capacity <= 0:
+                    print(f"  [warning] line {lineno} skipped (count and capacity must be >= 1)")
+                    continue
+                for _ in range(count):
+                    tables.append(Table(len(tables), capacity))
+            except ValueError as e:
+                print(f"  [warning] line {lineno} skipped ({e})")
+    return tables
 
 def allocate_reserved_tables(requests: List[Request], tables: List[Table]) -> dict:
     """
@@ -396,29 +427,145 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
         'total_time': total_time
     }
 
+# ---------- CLI helpers ----------
+def _print_results(stats: dict) -> None:
+    print("\nSimulation Result:")
+    print("------------------")
+    print(f"Average Wait Time:                   {stats['avg_wait']:.1f} min")
+    print(f"Max Wait Time:                       {stats['max_wait']} min")
+    print(f"Peak Queue Length:                   {stats['max_queue_len']}")
+    print(f"Groups Served:                       {stats['served']}")
+    print(f"Table Utilization:                   {stats['table_util']:.1f}%")
+    print(f"Service Level (seated within 10 min): {stats['service_level']:.1f}%")
+    print(f"Total Time:                          {stats['total_time']} min")
+
+
+def _ask_file(prompt: str, default: str) -> str:
+    """Prompt for a filename, using default if the user just hits Enter."""
+    raw = input(f"{prompt} [{default}]: ").strip()
+    return raw if raw else default
+
+
 # ---------- 主函数 ----------
 def main():
-    requests = load_requests('requests.csv')
+    # current simulation state
+    requests: List[Request] = []
+    tables: List[Table] = []
+    last_stats: dict = {}
 
-    # 餐桌配置
-    table_config = [(5,2), (3,4), (2,6), (1,8)]  # (数量, 容量)
-    tables = []
-    for count, cap in table_config:
-        for _ in range(count):
-            tables.append(Table(len(tables), cap))
+    MENU = """
+============================================
+  Restaurant Queue Simulator — Main Menu
+============================================
+  1. Load restaurant settings (tables)
+  2. Load customer requests
+  3. Run simulation
+  4. Show last results
+  5. Export last results to file
+  6. Exit
+--------------------------------------------"""
 
-    # 模拟
-    stats = simulate(requests, tables)
+    while True:
+        print(MENU)
+        choice = input("Enter option (1-6): ").strip()
 
-    print("Simulation Result:")
-    print("------------------")
-    print(f"Average Wait Time: {stats['avg_wait']:.1f} min")
-    print(f"Max Wait Time: {stats['max_wait']} min")
-    print(f"Peak Queue Length: {stats['max_queue_len']}")
-    print(f"Groups Served: {stats['served']}")
-    print(f"Table Utilization: {stats['table_util']:.1f}%")
-    print(f"Service Level (seated within 10 min): {stats['service_level']:.1f}%")
-    print(f"Total Time: {stats['total_time']} min")
+        # ── 1. Load restaurant settings ──────────────────────────────────────
+        if choice == '1':
+            filename = _ask_file("Restaurant CSV file", "restaurant.csv")
+            try:
+                tables = load_restaurant(filename)
+                if tables:
+                    print(f"  Loaded {len(tables)} tables from '{filename}'.")
+                    capacities: dict = {}
+                    for t in tables:
+                        capacities[t.max_people] = capacities.get(t.max_people, 0) + 1
+                    for cap, cnt in sorted(capacities.items()):
+                        print(f"    {cnt} x {cap}-seat table(s)")
+                else:
+                    print("  [error] No valid table entries found in file.")
+            except FileNotFoundError:
+                print(f"  [error] File not found: '{filename}'")
+            except Exception as e:
+                print(f"  [error] {e}")
+
+        # ── 2. Load customer requests ─────────────────────────────────────────
+        elif choice == '2':
+            filename = _ask_file("Requests CSV file", "requests.csv")
+            try:
+                requests = load_requests(filename)
+                if requests:
+                    print(f"  Loaded {len(requests)} customer request(s) from '{filename}'.")
+                    vip_count = sum(1 for r in requests if r.vip)
+                    res_count = sum(1 for r in requests if r.reserved)
+                    miss_count = sum(1 for r in requests if r.miss)
+                    if vip_count:
+                        print(f"    VIP customers: {vip_count}")
+                    if res_count:
+                        print(f"    Reserved customers: {res_count}")
+                    if miss_count:
+                        print(f"    Miss/comeback customers: {miss_count}")
+                else:
+                    print("  [error] No valid request entries found in file.")
+            except FileNotFoundError:
+                print(f"  [error] File not found: '{filename}'")
+            except Exception as e:
+                print(f"  [error] {e}")
+
+        # ── 3. Run simulation ─────────────────────────────────────────────────
+        elif choice == '3':
+            if not tables:
+                print("  [error] No tables loaded. Please choose option 1 first.")
+                continue
+            if not requests:
+                print("  [error] No requests loaded. Please choose option 2 first.")
+                continue
+            try:
+                import copy
+                last_stats = simulate(copy.deepcopy(requests), copy.deepcopy(tables))
+                _print_results(last_stats)
+            except ValueError as e:
+                print(f"  [error] {e}")
+            except RuntimeError as e:
+                print(f"  [error] Reservation conflict: {e}")
+            except Exception as e:
+                print(f"  [error] Unexpected error: {e}")
+
+        # ── 4. Show last results ──────────────────────────────────────────────
+        elif choice == '4':
+            if last_stats:
+                _print_results(last_stats)
+            else:
+                print("  No simulation has been run yet. Choose option 3 first.")
+
+        # ── 5. Export results to file ─────────────────────────────────────────
+        elif choice == '5':
+            if not last_stats:
+                print("  No results to export. Run a simulation first (option 3).")
+                continue
+            filename = _ask_file("Output file", "output.csv")
+            try:
+                with open(filename, 'w', encoding='utf-8') as f:
+                    f.write("Simulation Result:\n")
+                    f.write("------------------\n")
+                    f.write(f"Average Wait Time: {last_stats['avg_wait']:.1f} min\n")
+                    f.write(f"Max Wait Time: {last_stats['max_wait']} min\n")
+                    f.write(f"Peak Queue Length: {last_stats['max_queue_len']}\n")
+                    f.write(f"Groups Served: {last_stats['served']}\n")
+                    f.write(f"Table Utilization: {last_stats['table_util']:.1f}%\n")
+                    f.write(f"Service Level (seated within 10 min): {last_stats['service_level']:.1f}%\n")
+                    f.write(f"Total Time: {last_stats['total_time']} min\n")
+                print(f"  Results exported to '{filename}'.")
+            except Exception as e:
+                print(f"  [error] Could not write file: {e}")
+
+        # ── 6. Exit ───────────────────────────────────────────────────────────
+        elif choice == '6':
+            print("Goodbye.")
+            break
+
+        else:
+            print("  Invalid option. Please enter a number from 1 to 6.")
+
 
 if __name__ == "__main__":
     main()
