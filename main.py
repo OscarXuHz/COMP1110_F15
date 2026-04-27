@@ -161,6 +161,10 @@ def allocate(tables: List[Table], w_req: Request, cur_time: int) -> bool:
 
 # ---------- 模拟主函数 ----------
 def simulate(requests: List[Request], tables: List[Table]) -> dict:
+    if not requests:
+        raise ValueError("requests list must not be empty")
+    if not tables:
+        raise ValueError("tables list must not be empty")
     # 为预订顾客预留桌子
     reserved_map = allocate_reserved_tables(requests, tables)
 

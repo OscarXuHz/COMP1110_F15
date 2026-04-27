@@ -96,6 +96,84 @@ def get_customer_wait_times(served_requests: list) -> list:
     ]
 
 
+# ─── 输入校验 ─────────────────────────────────────────────────────────────────
+
+def validate_table_config(table_config: list) -> list:
+    """Return a list of error strings; empty means valid."""
+    errors = []
+    if not table_config:
+        errors.append("tableConfig must not be empty")
+        return errors
+    for i, item in enumerate(table_config):
+        try:
+            count = int(item["count"])
+            capacity = int(item["capacity"])
+        except (KeyError, TypeError, ValueError):
+            errors.append(f"tableConfig[{i}]: 'count' and 'capacity' must be integers")
+            continue
+        if count <= 0:
+            errors.append(f"tableConfig[{i}]: count must be >= 1, got {count}")
+        if capacity <= 0:
+            errors.append(f"tableConfig[{i}]: capacity must be >= 1, got {capacity}")
+    return errors
+
+
+def validate_requests(requests_data: list, max_capacity: int) -> list:
+    """Return a list of error strings; empty means valid."""
+    from datetime import datetime as _dt
+    errors = []
+    if not requests_data:
+        errors.append("requests must not be empty")
+        return errors
+    seen_indices = set()
+    for i, r in enumerate(requests_data):
+        prefix = f"requests[{i}] (index={r.get('index', '?')})"
+        # index
+        try:
+            idx = int(r["index"])
+            if idx in seen_indices:
+                errors.append(f"{prefix}: duplicate index {idx}")
+            seen_indices.add(idx)
+        except (KeyError, TypeError, ValueError):
+            errors.append(f"{prefix}: 'index' must be an integer")
+        # people
+        try:
+            people = int(r["people"])
+            if people <= 0:
+                errors.append(f"{prefix}: people must be >= 1, got {people}")
+            elif people > max_capacity:
+                errors.append(f"{prefix}: people ({people}) exceeds max table capacity ({max_capacity})")
+        except (KeyError, TypeError, ValueError):
+            errors.append(f"{prefix}: 'people' must be a positive integer")
+        # arrival
+        try:
+            _dt.strptime(str(r["arrival"]).strip(), "%Y%m%d%H%M%S")
+        except (KeyError, TypeError, ValueError):
+            errors.append(f"{prefix}: 'arrival' must be in YYYYMMDDHHMMSS format")
+        # duration
+        try:
+            dur = int(r["duration"])
+            if dur <= 0:
+                errors.append(f"{prefix}: duration must be >= 1, got {dur}")
+        except (KeyError, TypeError, ValueError):
+            errors.append(f"{prefix}: 'duration' must be a positive integer")
+        # binary fields
+        for field in ("share", "miss", "comeback", "vip", "reserved"):
+            try:
+                val = int(r[field])
+                if val not in (0, 1):
+                    errors.append(f"{prefix}: '{field}' must be 0 or 1, got {val}")
+            except (KeyError, TypeError, ValueError):
+                errors.append(f"{prefix}: '{field}' must be 0 or 1")
+        # logical constraint: comeback requires miss
+        try:
+            if int(r.get("comeback", 0)) == 1 and int(r.get("miss", 0)) == 0:
+                errors.append(f"{prefix}: comeback=1 requires miss=1")
+        except (TypeError, ValueError):
+            pass
+    return errors
+
+
 # ─── API 路由 ─────────────────────────────────────────────────────────────────
 
 @app.route("/")
@@ -120,10 +198,19 @@ def api_simulate():
         table_config = data.get("tableConfig", [])
         requests_data = data.get("requests", [])
 
-        if not table_config:
-            return jsonify({"success": False, "error": "餐桌配置不能为空"}), 400
-        if not requests_data:
-            return jsonify({"success": False, "error": "顾客请求不能为空"}), 400
+        # ── validate table config first ──
+        table_errors = validate_table_config(table_config)
+        if table_errors:
+            return jsonify({"success": False, "error": "Invalid table configuration",
+                            "details": table_errors}), 400
+
+        max_capacity = max(int(t["capacity"]) for t in table_config)
+
+        # ── validate requests ──
+        req_errors = validate_requests(requests_data, max_capacity)
+        if req_errors:
+            return jsonify({"success": False, "error": "Invalid request data",
+                            "details": req_errors}), 400
 
         # 构建对象
         tables = build_tables(table_config)
