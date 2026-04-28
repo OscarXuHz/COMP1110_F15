@@ -199,6 +199,40 @@
     line-height: 1.5;
   }
 
+  /* ── Hamburger Button ── */
+  .hamburger {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 34px;
+    height: 34px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    gap: 5px;
+    padding: 6px;
+    border-radius: 6px;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .hamburger:hover { background: var(--surface2); }
+  .hamburger span {
+    display: block;
+    width: 20px;
+    height: 2.5px;
+    background: var(--text);
+    border-radius: 2px;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    transform-origin: center;
+  }
+  .hamburger.active span:nth-child(1) { transform: translateY(7.5px) rotate(45deg); }
+  .hamburger.active span:nth-child(2) { opacity: 0; }
+  .hamburger.active span:nth-child(3) { transform: translateY(-7.5px) rotate(-45deg); }
+
+  /* ── Sidebar Drawer Backdrop ── */
+  .sidebar-backdrop { display: none; }
+
   /* ── Main Content ── */
   .main-content { padding: 32px; overflow-y: auto; }
   .page { display: none; }
@@ -633,8 +667,27 @@
 
   /* ── Responsive ── */
   @media (max-width: 900px) {
+    .hamburger { display: flex; }
     .app-layout { grid-template-columns: 1fr; }
-    .sidebar { display: none; }
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 60px;
+      height: calc(100vh - 60px);
+      z-index: 105;
+      transform: translateX(-100%);
+      transition: transform 0.3s ease;
+      box-shadow: 4px 0 16px rgba(0,0,0,0.08);
+    }
+    .sidebar.open { transform: translateX(0); }
+    .sidebar-backdrop.show {
+      display: block;
+      position: fixed;
+      inset: 0;
+      top: 60px;
+      background: rgba(0,0,0,0.3);
+      z-index: 95;
+    }
     .charts-grid { grid-template-columns: 1fr; }
   }
   @media (max-width: 600px) {
@@ -671,6 +724,11 @@
 <!-- Header -->
 <header class="app-header">
   <div class="logo">
+    <button class="hamburger" id="hamburgerBtn" onclick="toggleSidebar()" aria-label="Toggle navigation menu" aria-expanded="false">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
     <div class="icon">R</div>
     Restaurant Queue Simulator
   </div>
@@ -1042,6 +1100,9 @@
 
   </main>
 </div>
+
+<!-- Sidebar Backdrop (mobile drawer) -->
+<div class="sidebar-backdrop" onclick="closeSidebar()"></div>
 
 <!-- Toast Container -->
 <div class="toast-container" id="toastContainer"></div>
@@ -1501,6 +1562,30 @@ function applyI18n() {
 }
 
 // ═══════════════════════════════════════════════════════════
+//  Sidebar Drawer (mobile responsive)
+// ═══════════════════════════════════════════════════════════
+let sidebarOpen = false;
+
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  document.querySelector('.sidebar').classList.toggle('open', sidebarOpen);
+  document.querySelector('.sidebar-backdrop').classList.toggle('show', sidebarOpen);
+  const btn = document.getElementById('hamburgerBtn');
+  btn.classList.toggle('active', sidebarOpen);
+  btn.setAttribute('aria-expanded', sidebarOpen);
+}
+
+function closeSidebar() {
+  if (!sidebarOpen) return;
+  sidebarOpen = false;
+  document.querySelector('.sidebar').classList.remove('open');
+  document.querySelector('.sidebar-backdrop').classList.remove('show');
+  const btn = document.getElementById('hamburgerBtn');
+  btn.classList.remove('active');
+  btn.setAttribute('aria-expanded', 'false');
+}
+
+// ═══════════════════════════════════════════════════════════
 //  Global State
 // ═══════════════════════════════════════════════════════════
 const state = {
@@ -1528,6 +1613,7 @@ function showPage(name) {
   document.getElementById('nav-' + name).classList.add('active');
   if (name === 'run') updateRunPreview();
   if (name === 'results' && state.results) renderResults(state.results);
+  closeSidebar();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2112,6 +2198,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderRequests();
   await checkServer();
   await loadPresets();
+  // Close sidebar drawer on Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeSidebar();
+  });
 });
 </script>
 </body>
