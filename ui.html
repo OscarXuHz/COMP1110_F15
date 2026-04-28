@@ -919,7 +919,7 @@
       </div>
 
       <div class="run-panel">
-        <h2>Restaurant Queue Simulator</h2>
+        <h2 data-i18n="run_panel_title">Restaurant Queue Simulator</h2>
         <p data-i18n="run_desc">Event-driven restaurant queue engine — supports VIP priority, table sharing, reservations, missed turns and more</p>
         <div class="run-info">
           <div class="run-info-item">
@@ -1166,6 +1166,7 @@ const I18N = {
 
     // Run page
     run_title: 'Run Simulation',
+    run_panel_title: 'Restaurant Queue Simulator',
     run_subtitle: 'Review configuration and execute the restaurant queue simulation',
     run_desc: 'Event-driven restaurant queue engine — supports VIP priority, table sharing, reservations, missed turns and more',
     run_info_tables: 'Tables',
@@ -1360,6 +1361,7 @@ const I18N = {
 
     // Run page
     run_title: '运行模拟',
+    run_panel_title: '餐厅排队模拟器',
     run_subtitle: '检查配置并运行餐厅排队模拟',
     run_desc: '基于事件驱动的餐厅排队模拟引擎，支持 VIP 优先、拼桌、预订、过号等复杂场景',
     run_info_tables: '张桌子',
@@ -1719,14 +1721,21 @@ function parseCSVFile(file) {
   const reader = new FileReader();
   reader.onload = (e) => {
     const lines = e.target.result.trim().split('\n');
-    const header = lines[0].toLowerCase().replace(/\r/g, '').split(',');
+    if (lines.length === 0) return;
+    // 检测第一行是否有表头：若第一列不是纯数字，则视为表头行
+    var firstCol = lines[0].split(',')[0].trim();
+    var hasHeader = !/^\d+$/.test(firstCol);
+    var startLine = hasHeader ? 1 : 0;
+    var header = hasHeader
+      ? lines[0].toLowerCase().replace(/\r/g, '').split(',')
+      : ['index', 'people', 'arrival', 'duration', 'share', 'miss', 'comeback', 'vip', 'reserved'];
     const idx = (name) => header.indexOf(name);
     const imported = [];
-    for (let i = 1; i < lines.length; i++) {
+    for (let i = startLine; i < lines.length; i++) {
       const cols = lines[i].replace(/\r/g, '').split(',');
       if (cols.length < 5) continue;
       imported.push({
-        index: parseInt(cols[idx('index')] || cols[0]) || (state.nextRequestIndex + i - 1),
+        index: parseInt(cols[idx('index')] || cols[0]) || (state.nextRequestIndex + i - startLine),
         people: parseInt(cols[idx('people')] || cols[1]) || 2,
         arrival: (cols[idx('arrival')] || cols[2] || '').trim(),
         duration: parseInt(cols[idx('duration')] || cols[3]) || 30,
