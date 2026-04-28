@@ -1,7 +1,32 @@
+"""Restaurant Queue Simulator — core simulation engine.
+
+Public API (imported by app.py and used by the CLI):
+    Request, Table      — data model dataclasses
+    parse_time          — YYYYMMDDHHMMSS → integer minutes
+    load_requests       — read customer CSV file
+    load_restaurant     — read table-config CSV file
+    allocate_reserved_tables — pre-assign reserved tables
+    allocate            — seat one waiting customer
+    simulate            — run full event-driven simulation
+"""
+from __future__ import annotations
+
 import heapq
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Tuple, Optional
+
+__all__ = [
+    "Request",
+    "Table",
+    "parse_time",
+    "load_requests",
+    "load_restaurant",
+    "allocate_reserved_tables",
+    "allocate",
+    "simulate",
+]
 
 # ---------- 数据类 ----------
 @dataclass
@@ -211,7 +236,7 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
     queue_id_counter = 0        # 全局唯一ID保证稳定顺序
 
     # 过号队列: 存放已经 comeback 但尚未被激活的顾客
-    miss_queue = []             # 元素为 Request
+    miss_queue: deque = deque()  # 元素为 Request（使用 deque 保证 popleft 为 O(1)）
 
     # 统计变量
     served_requests = []
@@ -256,7 +281,7 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
                         normal_served_count += 1
                         # 每累计3个普通顾客，激活一个过号顾客，然后计数器清零
                         if normal_served_count >= 3 and miss_queue:
-                            missed_req = miss_queue.pop(0)
+                            missed_req = miss_queue.popleft()
                             missed_req.arrival = cur_time
                             missed_req.is_miss_reactivated = True
                             queue_id_counter += 1
@@ -358,7 +383,7 @@ def simulate(requests: List[Request], tables: List[Table]) -> dict:
                     normal_served_count += 1
                     # 每累计3个普通顾客，激活一个过号顾客，然后清零
                     if normal_served_count >= 3 and miss_queue:
-                        missed_req = miss_queue.pop(0)
+                        missed_req = miss_queue.popleft()
                         missed_req.arrival = cur_time
                         missed_req.is_miss_reactivated = True
                         queue_id_counter += 1

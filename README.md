@@ -65,3 +65,35 @@ Open your web browser and navigate to:
 ## Developer Notes
 
 To ensure compatibility, maintain the standard interface functions within `main.py`. The UI layer communicates with the backend using JSON, making it easy to extend or adapt to different scheduling algorithms.
+
+---
+
+## File Format Reference
+
+### Request files (`requests.csv`, `request1–10.csv`)
+Plain CSV, **no header row**, 9 comma-separated columns:
+```
+index, people, arrival(YYYYMMDDHHMMSS), duration(min), share(0/1), miss(0/1), comeback(0/1), vip(0/1), reserved(0/1)
+```
+
+### Restaurant/table config files (`restaurant.csv`, `restaurant1–10.csv`)
+Plain CSV, **no header row**, 2 columns:
+```
+count, capacity
+```
+Each row defines `count` tables each with `capacity` seats.
+
+### Output reference files (`output1–10.csv`)
+These are **plain-text simulation reports** (not CSV data), stored with a `.csv` extension for convenience. Each file contains 9 lines in the following fixed format:
+```
+Simulation Result:
+------------------
+Average Wait Time: X.X min
+Max Wait Time: X min
+Peak Queue Length: X
+Groups Served: X
+Table Utilization: X.X%
+Service Level (seated within 10 min): X.X%
+Total Time: X min
+```
+These files serve as the expected reference output for each paired test case and can be reproduced by running the CLI (option 3 → option 5).

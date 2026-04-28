@@ -65,19 +65,21 @@ def build_requests(requests_data: list) -> list:
     return reqs
 
 
-def get_per_table_util(tables: list, served_requests: list, total_time: int) -> list:
-    """计算每张桌子的利用率（需要在 simulate 后调用）"""
-    # 注意：simulate 函数内部已经计算了 table_busy_time，但没有返回
-    # 我们在这里通过 served_requests 重新计算
-    table_busy = {}
-    for req in served_requests:
-        if req.table is not None:
-            tid = req.table.index
-            table_busy[tid] = table_busy.get(tid, 0) + req.duration
-
+def get_per_table_util(tables: list, total_time: int) -> list:
+    """计算每张桌子的利用率，使用与 main.py 相同的区间合并算法避免重叠计算。"""
     result = []
     for t in tables:
-        busy = table_busy.get(t.index, 0)
+        if t.history and total_time > 0:
+            intervals = sorted((c.arrival, c.leave_time) for c in t.history)
+            merged = []
+            for start, end in intervals:
+                if not merged or start > merged[-1][1]:
+                    merged.append([start, end])
+                else:
+                    merged[-1][1] = max(merged[-1][1], end)
+            busy = sum(end - start for start, end in merged)
+        else:
+            busy = 0
         util = (busy / total_time * 100) if total_time > 0 else 0
         result.append({
             "table_id": t.index + 1,
@@ -222,7 +224,7 @@ def api_simulate():
         # 提取每张桌子利用率和每位顾客等待时间
         # 从 reqs 中找出已服务的顾客（table 不为 None 说明已入座）
         served = [r for r in reqs if r.table is not None]
-        per_table = get_per_table_util(tables, served, stats["total_time"])
+        per_table = get_per_table_util(tables, stats["total_time"])
         wait_times = get_customer_wait_times(served)
 
         return jsonify({
