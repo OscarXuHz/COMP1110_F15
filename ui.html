@@ -1977,14 +1977,21 @@ async function runSimulation() {
       body: JSON.stringify({ tableConfig: state.tableConfig, requests: state.requests }),
     });
     const data = await resp.json();
-    if (!data.success) throw new Error(data.error || 'Simulation failed');
+    if (!data.success) {
+      let msg = data.error || 'Simulation failed';
+      if (data.details && data.details.length > 0) {
+        msg += '\n• ' + data.details.slice(0, 5).join('\n• ');
+        if (data.details.length > 5) msg += `\n…and ${data.details.length - 5} more`;
+      }
+      throw new Error(msg);
+    }
 
     state.results = data.results;
     renderResults(data.results);
     showPage('results');
     toast(t('toast_sim_done'), 'success');
   } catch (e) {
-    toast(t('toast_err_sim', e.message), 'error', 6000);
+    toast(t('toast_err_sim', e.message), 'error', 8000);
     console.error(e);
   } finally {
     btn.disabled = false;
