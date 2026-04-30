@@ -307,8 +307,10 @@ def api_presets():
         has_reserved = any(r["reserved"] for r in requests_data)
         has_miss = any(r["miss"] for r in requests_data)
 
+        label = f"{(i+1)//2}{'A' if i % 2 == 1 else 'B'}"
         presets.append({
             "id": i,
+            "label": label,
             "name": f"Request {i}",
             "count": n,
             "hasVip": has_vip,
